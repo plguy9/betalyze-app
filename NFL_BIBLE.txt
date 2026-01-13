@@ -1,0 +1,117 @@
+NFL BETALYZE – PLAYBOOK COMPLET
+================================
+
+1) Vision & Experience
+- Section NFL aussi riche que la NBA, centrée parieurs : insights rapides, classements offense/défense, matchups semaine, props-guides, alertes blessures/lines.
+- Navigation : onglet NFL, page d’overview (semaine en cours + classements), pages équipes, pages joueurs, pages match détaillé, module “defense vs position”, module tendances paris (ATS/O-U/props).
+
+2) Données / Endpoints à consommer (avec clé API)
+- Teams : infos de base (nom, logo, conf/division, record).
+- Games / schedule : semaine en cours, résultats, spreads/OU si dispo.
+- Games statistics (boxscore) : yards pass/run, plays, drives si dispo, 1st down, TO, sacks, 3rd/4th down, redzone.
+- Players & player stats : QB/RB/WR/TE/DEF (tackles/sacks/INT).
+- Injuries / inactifs (si endpoint).
+- Odds/lines : spread, moneyline, total, props joueurs (si source).
+- Option tracking : si API expose EPA/play, aDOT, air yards, yak, pressures (sinon dérivés simples).
+
+3) Métriques clés à exposer (par équipe)
+- Offense : points/drive (si drives) ou points/match, yards/play, pass vs run split, early down success (si dispo), 3rd/4th down conv, redzone TD rate, TO diff, sacks allowed rate, pace (plays/game).
+- Defense : points/drive concédés, yards/play concédés, success rate déf (si dispo), run D vs pass D (EPA ou yards/play), pressure/sacks rate, TO forcés, 3rd/4th stop, redzone TD concédé.
+- Pace & style : plays/game, no-huddle %, neutral pass rate (1er/2e quart, score neutre), run/pass ratio en avance/en retard.
+- Special teams (option) : punt/FG efficiency, starting field position (si dispo).
+
+4) Defense vs Position (fantasy/props)
+- Yards/TD concédés à QB/RB/WR/TE, réceptions/targets concédées à RB/WR/TE, rush yards/TD concédés (RB/QB), pass yards/TD/INT concédés (QB), 3P+ sacks/pressures (impact QB).
+- Classements par poste (ex : “vs RB : #29, vs WR : #8, vs TE : #31”).
+- Split home/away et dernières 4 semaines.
+
+5) Classements & tableaux
+- Power rankings Off/Def/Net (points/drive ou EPA/play selon data).
+- Pace rankings (plays/game, neutral pace).
+- TO diff rankings, redzone O/D rankings, 3rd down O/D rankings.
+- Matchups semaine : mismatchs Off vs Def (yards/play, pass/run splits, redzone, TO diff).
+
+6) Pages / Modules
+- Page Overview NFL :
+  - Week en cours : liste des matchs (horaire, spread/OU si dispo, edge Off/Def résumé).
+  - Top matchups (shootout candidates, defensive slugfests).
+  - Classements Off/Def/Net/Pace + filtres (saison, last 4, home/away).
+  - Leaders joueurs par poste (QB yards/TD/INT, RB rush yards/TD, WR/TE rec yards/TD).
+- Page Équipe :
+  - Header : record, streak, Net rating, pace, TO diff, redzone O/D, 3rd down O/D.
+  - Off/Def splits : yards/play, pass/run split, points/drive (ou /match), success rate (si dispo), pressure/sacks for/allowed.
+  - Defense vs position (table par poste) + recent form (last 4).
+  - Game log : affichage matchups, linescore, spread/OU résultat (cover/over).
+- Page Joueur :
+  - QB : yards, TD, INT, CPOE (si dispo), air yards, aDOT, pressure %, sacks, rush yards/TD.
+  - RB : carries, yards, YPC, targets, rec yards, rush TD, rec TD, redzone carries/targets.
+  - WR/TE : targets, rec, yards, TD, aDOT, air yards share, YAC, redzone targets.
+  - Props helper : projection simple vs defense (yards/run vs run D, yards/rec vs pass D, usage récent).
+- Page Match :
+  - Matchup Off vs Def des deux équipes (yards/play, pass/run splits, redzone, 3rd/4th).
+  - Pace & play volume attendu, TO risk, pressure vs protection.
+  - Lines : spread/OU et indicateurs “cover/over %”, si historique dispo.
+
+7) Data pipeline (backend à prévoir)
+- Routes internes : `/api/nfl/teams`, `/api/nfl/games`, `/api/nfl/games/[id]/stats`, `/api/nfl/teams/[id]/ratings`, `/api/nfl/defense-vs-position`, `/api/nfl/players`, `/api/nfl/players/[id]/stats`.
+- Agrégation ratings : points/drive (si drives), sinon points/play, yards/play, Off/Def, Net, Pace (plays/game), TO diff, redzone, 3rd/4th.
+- Defense vs position : agréger boxscores par poste adverse (QB/RB/WR/TE) sur la saison et last 4.
+- Caching local pour limiter appels, fallback sur saisons autorisées si plan API restreint.
+
+8) UX pour parieurs
+- Badges “edge” : mismatch Off/Def (ex : #2 pass O vs #28 pass D), pace élevé, TO diff extrême.
+- Filtres rapides : saison, last 4, home/away, surface (si dispo), météo (si dispo).
+- Tooltips pédagogiques sur chaque stat (aide pari).
+- Alertes : blessures majeures, changements QB, météo extrême, line movement (si source lines).
+
+9) Roadmap build
+- Phase 1 : overview NFL + classements Off/Def/Net/Pace + matchups semaine (sans props).
+ - Phase 2 : pages équipes avec ratings détaillés + defense vs position (basique yards/TD concédés).
+  - Phase 3 : pages joueurs (leaders + fiches) + props helper.
+  - Phase 4 : enrichissement (EPA/play si dispo, CPOE, aDOT/air yards, pressure) + alertes & lines.
+
+10) Notes de calcul (si drives non fournis)
+- Possessions proxy : plays + (TO si pas compté) ajusté run/pass, ou drives si champ présent.
+- Ratings Off/Def : points/100 plays ou points/drive si drives dispo.
+- Pace : plays/game, et neutral pace si on filtre par score neutre (si temps/score dispo).
+
+Objectif : livrer une section NFL “prête à parier”, avec les meilleurs indicateurs offense/défense, pace, TO diff, redzone, 3rd/4th, defense vs position, et des vues joueurs pour props.
+
+11) Inspirations NBA répliquées pour NFL (et plus)
+- Top matchups / Spotlight players : carte “best spots” semaine (shootout potentiel, mismatch défensif, usage volume). Spotlight joueurs (QB/RB/WR/TE) avec projection simple vs défense (yards/TD attendus, prop edge).
+- Autosuggest & recherche : équipes/joueurs, liens vers fiche équipe, fiche joueur, match.
+- Game Log : table des matchs (score, spread/OU outcome, yards/run/pass, TO). Tag “cover/over” pour suivi ATS/OU.
+- Ratings visibles : Off/Def/Net, Pace (plays/drive), TS% équivalent côté NFL (EPA/play si dispo), turnovers per drive.
+- Tooltips pédagogiques sur chaque métrique (comme les “!” NBA).
+
+12) Fonctionnalités bonus pour parieurs
+- Strength of Schedule (SoS) et Strength of Opposing Units : SoS global + SoS pass/run, SoS défenses affrontées (pour contextualiser stats).
+- Line movement & consensus (si source) : suivi ouverture vs actuel, % tickets/handle (si dispo).
+- Injury impact : stat lines “with/without” joueurs clés (QB, LT, WR1, EDGE/CB1) sur Off/Def rating, pass/run efficiency.
+- Situational splits : home/away, surface (turf/grass), weather tag (si meteo dispo), rest days, back-to-back road, travel distance/time zone.
+- Script & pace projection : neutral pass rate, pace neutre, run rate in lead/trail, projet de volume plays.
+- Redzone & 3rd down ladders : classements O/D redzone TD%, 3rd/4th conv/stop.
+- TO luck check : TO diff vs fumble luck (si fumbles for/against dispo) pour détecter régressions possibles.
+- Penalties : pénalités par match, yards pénalité, first downs donnés/obtenus par pénalité.
+
+13) Joueurs et props avancés
+- QB : EPA/play (si dispo), CPOE, air yards, time to throw, pressure %, sacks, scramble rate, designed run rate, redzone usage.
+- RB : rush share, target share, redzone carries/targets, yards after contact, missed tackles forced (si dispo).
+- WR/TE : target share, air yards share, aDOT, YAC, slot vs wide usage, redzone targets.
+- DEF : pressures, sacks, QB hits, missed tackle rate, coverage stats (si dispo), turnovers forced.
+- Props helper : projection simple vs défense (yards/TD/receptions), edge vs lignes si API odds/props accessible.
+
+14) Classements et dashboards supplémentaires
+- Power Rankings multi-métriques : Off/Def/EPA (si dispo), Pace, TO diff, Redzone O/D, 3rd/4th O/D.
+- Defense vs Position dashboard : tables par poste (QB/RB/WR/TE) avec last 4, season, home/away.
+- Trends ATS/OU (si lines dispo) : record ATS, over/under %, margin of cover, margin vs total.
+- Heatmaps : run/pass rate par down/distance, run direction (gauche/milieu/droite) si plays détaillés dispos.
+- Opponent filters : filtrer stats vs top10 Off/Def, vs top run/pass offenses, vs pressions élevées.
+
+15) Intégration future (si data enrichie)
+- EPA/play et success rate : meilleure base pour ratings offensifs/défensifs.
+- Drives et starting field position : calcul points/drive, points attendus, PPD net.
+- Win probability & live (si temps réel) : chart WPA, probabilité de cover live.
+- Alerting : push “line moved”, “QB downgraded”, “weather severe”, “starter inactive”.
+
+Conclusion : ce playbook couvre les blocs à coder pour une section NFL exhaustive : données équipes, joueurs, matchups, ratings Off/Def/Pace, defense vs position, classements, props-helper, contexte pari (SoS, injuries, lignes), et roadmap phasée. Dès que la clé API NFL est fournie et les endpoints confirmés, on peut prioriser Phase 1 (overview + classements) puis étendre.

@@ -1,0 +1,7 @@
+{
+  "mock": true,
+  "teams": [
+    { "id": 1, "name": "Mock Lakers" },
+    { "id": 2, "name": "Mock Celtics" }
+  ]
+}

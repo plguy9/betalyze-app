@@ -87,6 +87,40 @@ const FALLBACK_TEAMS: BetalyzeNbaTeam[] = [
   { id: 160, name: 'Jazz', fullName: 'Utah Jazz', code: 'UTA', city: 'Salt Lake City', logo: 'https://media.api-sports.io/basketball/teams/160.png', conference: 'West', division: null, isFranchise: true },
 ];
 
+// Codes officiels NBA par ID API-Sports
+const CODE_BY_TEAM_ID: Record<number, string> = {
+  132: "ATL",
+  133: "BOS",
+  134: "BKN",
+  135: "CHA",
+  136: "CHI",
+  137: "CLE",
+  140: "DET",
+  143: "IND",
+  147: "MIA",
+  148: "MIL",
+  151: "NYK",
+  153: "ORL",
+  154: "PHI",
+  159: "TOR",
+  161: "WAS",
+  138: "DAL",
+  139: "DEN",
+  141: "GSW",
+  142: "HOU",
+  144: "LAC",
+  145: "LAL",
+  146: "MEM",
+  149: "MIN",
+  150: "NOP",
+  152: "OKC",
+  155: "PHX",
+  156: "POR",
+  157: "SAC",
+  158: "SAS",
+  160: "UTA",
+};
+
 // Map ID -> Conférence (à partir de la réponse API-Sports)
 const TEAM_CONFERENCE: Record<number, 'East' | 'West'> = {
   132: 'East', // Hawks
@@ -125,13 +159,21 @@ const TEAM_CONFERENCE: Record<number, 'East' | 'West'> = {
 // Ids des “fake teams” East / West de l’API
 const FAKE_TEAMS_IDS = new Set<number>([1416, 1417]);
 
+function normalizeSeason(value: string): string {
+  const match = value.match(/(\d{4})/);
+  if (!match) return value;
+  const year = Number(match[1]);
+  if (!Number.isFinite(year)) return value;
+  return `${year}-${year + 1}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
     // Saison en format API-Sports basket
     const seasonParam = searchParams.get('season') ?? DEFAULT_SEASON;
-    const season = seasonParam;
+    const season = normalizeSeason(seasonParam);
     const cacheKey = `season:${season}`;
 
     const cached = memoryCache.get(cacheKey);
@@ -205,7 +247,7 @@ export async function GET(request: NextRequest) {
           id: team.id,
           name: team.name,
           fullName,
-          code: null,         // à enrichir plus tard si tu veux
+          code: CODE_BY_TEAM_ID[team.id] ?? null,
           city,
           logo: logoUrl,
           conference,

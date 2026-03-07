@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // --- Cache minimal pour Betalyze ---
@@ -38,4 +39,24 @@ model Player {
 
   @@index([sport, lastName, firstName])
   @@unique([sport, externalId])
+}
+
+model NflDefenseDvp {
+  id            Int      @id @default(autoincrement())
+  season        String
+  window        String
+  context       String
+  teamId        Int
+  teamName      String?
+  teamAbbr      String?
+  position      String
+  games         Int
+  ffpTotal      Float
+  ffpPerGame    Float
+  metrics       Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([season, window, context, teamId, position])
+  @@index([season, window, context, position])
 }

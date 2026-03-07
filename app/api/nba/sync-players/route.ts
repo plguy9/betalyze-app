@@ -2,11 +2,16 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import type { NbaPlayer } from "@/lib/models/nba";
+import {
+  normalizeNbaSeasonLabel,
+  upsertNbaPlayersForSeason,
+  type NbaPlayerRecord,
+} from "@/lib/nba/players-db";
 
 const API_BASE = process.env.APISPORTS_BASKETBALL_URL;
 const API_KEY = process.env.APISPORTS_KEY;
-const SEASON = process.env.APISPORTS_BASKETBALL_SEASON ?? "2024-2025";
+const RAW_SEASON = process.env.APISPORTS_BASKETBALL_SEASON ?? "2025-2026";
+const SEASON = normalizeNbaSeasonLabel(RAW_SEASON);
 
 // Même IDs que dans /api/nba/teams
 const NBA_TEAM_IDS: number[] = [
@@ -56,22 +61,30 @@ export async function GET() {
     }
 
     // Mapping minimal vers NbaPlayer (on enrichira plus tard)
-    const mapped: NbaPlayer[] = allPlayers.map((p: any) => ({
-      id: p.id,
-      fullName: p.name ?? "",
-      firstName: null,
-      lastName: null,
-      teamId: p.teamId ?? null,
-      teamName: null,
-      teamCode: null,
-      position: p.position ?? null,
-      jerseyNumber: p.number ?? null,
-      height: null,
-      weight: null,
-      nationality: p.country ?? null,
-      birthDate: null,
-      isActive: true,
-    }));
+    const mapped: NbaPlayerRecord[] = allPlayers.map((p: any) => {
+      const rawName = p.name ?? "";
+      const parts = typeof rawName === "string" ? rawName.split(/\s+/).filter(Boolean) : [];
+      const firstName = parts.length >= 2 ? parts[parts.length - 1] : parts[0] ?? null;
+      const lastName = parts.length >= 2 ? parts.slice(0, -1).join(" ") : null;
+      const fullName = [firstName, lastName].filter(Boolean).join(" ") || rawName;
+      return {
+        id: p.id,
+        fullName,
+        firstName,
+        lastName,
+        teamId: p.teamId ?? null,
+        teamName: null,
+        teamCode: null,
+        position: p.position ?? null,
+        jerseyNumber: p.number ? String(p.number) : null,
+        age: null,
+        height: null,
+        weight: null,
+        nationality: p.country ?? null,
+        birthDate: null,
+        isActive: true,
+      };
+    });
 
     await fs.mkdir(CACHE_DIR, { recursive: true });
     await fs.writeFile(
@@ -89,11 +102,18 @@ export async function GET() {
       "utf-8"
     );
 
+    const dbUpserted = await upsertNbaPlayersForSeason({
+      season: SEASON,
+      source: "sync-players",
+      players: mapped,
+    }).catch(() => 0);
+
     return NextResponse.json(
       {
         season: SEASON,
         count: mapped.length,
         cacheFile: CACHE_FILE,
+        dbUpserted,
       },
       { status: 200 }
     );

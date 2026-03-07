@@ -2,14 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.APISPORTS_NBA_URL ||
   process.env.APISPORTS_BASKETBALL_URL ||
-  "https://v2.nba.api-sports.io";
+  process.env.APISPORTS_NBA_URL ||
+  "https://v1.basketball.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const DEFAULT_SEASON =
-  process.env.APISPORTS_NBA_SEASON ||
   process.env.APISPORTS_BASKETBALL_SEASON ||
-  "2025";
+  process.env.APISPORTS_NBA_SEASON ||
+  "2025-2026";
+const IS_BASKETBALL_V1 = API_BASE.includes("basketball");
 
 // Correspondance codes -> IDs NBA v2 (https://v2.nba.api-sports.io)
 const V2_TEAM_ID_BY_CODE: Record<string, number> = {
@@ -85,6 +86,62 @@ function resolveV2TeamId(teamId: number) {
   return V2_TEAM_ID_BY_CODE[code] ?? teamId;
 }
 
+function resolveTeamIdForApi(teamId: number) {
+  if (IS_BASKETBALL_V1) return teamId;
+  return resolveV2TeamId(teamId);
+}
+
+function normalizeSeason(value: string): string {
+  const match = value.match(/(\d{4})/);
+  if (!match) return value;
+  const year = Number(match[1]);
+  if (!Number.isFinite(year)) return value;
+  return IS_BASKETBALL_V1 ? `${year}-${year + 1}` : String(year);
+}
+
+function pointsFromGame(game: any, teamId: number | null | undefined): number | null {
+  const homeId = game?.teams?.home?.id ?? null;
+  const awayId = game?.teams?.away?.id ?? null;
+  const homeScoreRaw = game?.scores?.home?.total ?? null;
+  const awayScoreRaw = game?.scores?.away?.total ?? null;
+  const homeScore =
+    typeof homeScoreRaw === "number" ? homeScoreRaw : Number(homeScoreRaw);
+  const awayScore =
+    typeof awayScoreRaw === "number" ? awayScoreRaw : Number(awayScoreRaw);
+  if (homeId === teamId) return Number.isFinite(homeScore) ? homeScore : null;
+  if (awayId === teamId) return Number.isFinite(awayScore) ? awayScore : null;
+  return null;
+}
+
+function normalizeStatsLine(entry: any): GameStatsLine | null {
+  if (!entry) return null;
+  if (entry.statistics && Array.isArray(entry.statistics) && entry.statistics[0]) {
+    return entry.statistics[0] as GameStatsLine;
+  }
+  return {
+    points: entry?.points ?? null,
+    fgm: entry?.field_goals?.total ?? null,
+    fga: entry?.field_goals?.attempts ?? null,
+    ftm: entry?.freethrows_goals?.total ?? null,
+    fta: entry?.freethrows_goals?.attempts ?? null,
+    tpm: entry?.threepoint_goals?.total ?? null,
+    tpa: entry?.threepoint_goals?.attempts ?? null,
+    offReb: entry?.rebounds?.offence ?? null,
+    defReb: entry?.rebounds?.defense ?? null,
+    turnovers: entry?.turnovers ?? null,
+  };
+}
+
+function isFinishedGame(game: any): boolean {
+  const short = game?.status?.short;
+  if (typeof short === "number") return short === 3;
+  if (typeof short === "string") {
+    const val = short.toUpperCase();
+    return val === "FT" || val === "AOT" || val === "OT";
+  }
+  return false;
+}
+
 type GameStatsLine = {
   points?: number | null;
   fgm?: number | null;
@@ -127,14 +184,15 @@ export async function GET(
     return NextResponse.json({ error: "Missing API key" }, { status: 500 });
   }
 
-  const searchSeason = req.nextUrl.searchParams.get("season") ?? DEFAULT_SEASON;
+  const rawSeason = req.nextUrl.searchParams.get("season") ?? DEFAULT_SEASON;
+  const searchSeason = normalizeSeason(rawSeason);
   const wantDebug = req.nextUrl.searchParams.get("debug") === "1";
-  const v2Id = resolveV2TeamId(teamId);
+  const teamIdForApi = resolveTeamIdForApi(teamId);
 
   try {
     // 1) Liste des matchs de la saison pour ce team
     const gamesUrl = new URL("/games", API_BASE);
-    gamesUrl.searchParams.set("team", String(v2Id));
+    gamesUrl.searchParams.set("team", String(teamIdForApi));
     gamesUrl.searchParams.set("season", String(searchSeason));
     const gamesRes = await fetch(gamesUrl.toString(), {
       headers: { "x-apisports-key": API_KEY },
@@ -151,7 +209,7 @@ export async function GET(
     const gamesList = Array.isArray(gamesJson?.response) ? gamesJson.response : [];
     // On garde uniquement les matchs finis (status.short === 3) et stage != 1 (pas pré-saison)
     const finished = gamesList
-      .filter((g: any) => g?.status?.short === 3 && g?.stage !== 1)
+      .filter((g: any) => isFinishedGame(g) && g?.stage !== 1)
       .sort((a: any, b: any) => {
         const da = Date.parse(a?.date?.start ?? "");
         const db = Date.parse(b?.date?.start ?? "");
@@ -189,7 +247,10 @@ export async function GET(
     for (const g of finished) {
       const gameId = g?.id;
       if (!gameId) continue;
-      const statsUrl = new URL("/games/statistics", API_BASE);
+      const statsUrl = new URL(
+        IS_BASKETBALL_V1 ? "/games/statistics/teams" : "/games/statistics",
+        API_BASE,
+      );
       statsUrl.searchParams.set("id", String(gameId));
       const statsRes = await fetch(statsUrl.toString(), {
         headers: { "x-apisports-key": API_KEY },
@@ -198,14 +259,28 @@ export async function GET(
       if (!statsRes.ok) continue;
       const statsJson = await statsRes.json();
       const entries = Array.isArray(statsJson?.response) ? statsJson.response : [];
-      const myEntry = entries.find((e: any) => String(e?.team?.id) === String(v2Id));
-      const oppEntry = entries.find((e: any) => String(e?.team?.id) !== String(v2Id));
-      const myStats = myEntry?.statistics?.[0] as GameStatsLine | undefined;
-      const oppStats = oppEntry?.statistics?.[0] as GameStatsLine | undefined;
+      const myEntry = entries.find(
+        (e: any) => String(e?.team?.id) === String(teamIdForApi),
+      );
+      const oppEntry = entries.find(
+        (e: any) => String(e?.team?.id) !== String(teamIdForApi),
+      );
+      const myStats = normalizeStatsLine(myEntry ?? null) ?? undefined;
+      const oppStats = normalizeStatsLine(oppEntry ?? null) ?? undefined;
       const myPoss = myStats ? calcPoss(myStats) : null;
       const oppPoss = oppStats ? calcPoss(oppStats) : null;
-      const myPts = myStats?.points ?? null;
-      const oppPts = oppStats?.points ?? null;
+      const myPts =
+        myStats?.points ?? (IS_BASKETBALL_V1 ? pointsFromGame(g, teamIdForApi) : null);
+      const oppPts =
+        oppStats?.points ??
+        (IS_BASKETBALL_V1
+          ? pointsFromGame(
+              g,
+              String(teamIdForApi) === String(g?.teams?.home?.id)
+                ? g?.teams?.away?.id
+                : g?.teams?.home?.id,
+            )
+          : null);
 
       if (
         myPoss !== null &&

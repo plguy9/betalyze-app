@@ -1,6 +1,7 @@
 // app/api/nfl/players/[id]/statistics/route.ts
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const API_KEY = process.env.APISPORTS_KEY;
 const API_BASE =
@@ -77,6 +78,39 @@ export async function GET(
   }
 
   try {
+    let rosterPlayer: {
+      position: string | null;
+      team: {
+        id: number;
+        name: string;
+        abbreviation: string | null;
+        externalId: string | null;
+      } | null;
+    } | null = null;
+    try {
+      rosterPlayer = await prisma.player.findUnique({
+        where: {
+          sport_externalId: {
+            sport: "nfl",
+            externalId: String(playerId),
+          },
+        },
+        select: {
+          position: true,
+          team: {
+            select: {
+              id: true,
+              name: true,
+              abbreviation: true,
+              externalId: true,
+            },
+          },
+        },
+      });
+    } catch (err) {
+      console.warn("NFL stats roster lookup failed:", err);
+      rosterPlayer = null;
+    }
     // L'API retourne des statistiques NFL uniquement avec le paramètre "id" (pas besoin de league).
     const paramVariants = ["id", "player"] as const;
     const attempts: Array<{ url: string; status?: number; errors?: any }> = [];
@@ -87,10 +121,21 @@ export async function GET(
       url.searchParams.set(param, String(playerId));
       url.searchParams.set("season", String(season));
 
-      const res = await fetch(url.toString(), {
-        headers: { "x-apisports-key": API_KEY },
-        cache: "no-store",
-      });
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          headers: { "x-apisports-key": API_KEY },
+          cache: "no-store",
+        });
+      } catch (err) {
+        attempts.push({
+          url: url.toString(),
+          status: undefined,
+          errors: { message: String(err) },
+        });
+        continue;
+      }
+
       const textBody = await res.text().catch(() => "");
       let jsonBody: any = null;
       try {
@@ -116,11 +161,23 @@ export async function GET(
         : [];
       const statsByGroup = normalizeGroups(groups);
 
+      const rosterTeamId = rosterPlayer?.team?.externalId
+        ? Number(rosterPlayer.team.externalId)
+        : rosterPlayer?.team?.id ?? null;
       const player = {
         id: first?.player?.id ?? playerId,
         name: first?.player?.name ?? null,
         image: first?.player?.image ?? null,
-        team: first?.teams?.[0]?.team ?? null,
+        position: rosterPlayer?.position ?? first?.player?.position ?? null,
+        team:
+          rosterPlayer?.team?.name
+            ? {
+                id: Number.isFinite(rosterTeamId) ? rosterTeamId : rosterPlayer.team.id,
+                name: rosterPlayer.team.name,
+                logo: null,
+                code: rosterPlayer.team.abbreviation,
+              }
+            : first?.teams?.[0]?.team ?? null,
       };
       if (player.image && (await isPlaceholderImage(player.image))) {
         player.image = null;

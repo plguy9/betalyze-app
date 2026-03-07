@@ -29,7 +29,11 @@ const checks = [
   { key: 'APISPORTS_NFL_SEASON', required: false, note: 'Saison NFL (2024/2025)' },
   { key: 'NEXT_PUBLIC_APISPORTS_BASKETBALL_SEASON', required: false, note: 'Saison exposee au front' },
   { key: 'THE_ODDS_API_KEY', required: false, note: 'Cle The Odds API (props joueurs)' },
+  { key: 'SPORTSGAMEODDS_API_KEY', required: false, note: 'Cle SportsGameOdds (props NBA)' },
+  { key: 'SPORTSGAMEODDS_API_URL', required: false, note: 'Base API SportsGameOdds' },
   { key: 'NHL_API_URL', required: false, note: 'Base API NHL' },
+  { key: 'SUPABASE_URL', required: false, note: 'URL Supabase (cache logs NBA)' },
+  { key: 'SUPABASE_SERVICE_ROLE_KEY', required: false, note: 'Service role Supabase (cache logs NBA)' },
 ];
 
 const results = checks.map((item) => {

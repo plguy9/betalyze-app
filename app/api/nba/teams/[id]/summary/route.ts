@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.APISPORTS_NBA_URL ||
   process.env.APISPORTS_BASKETBALL_URL ||
-  "https://v2.nba.api-sports.io";
+  process.env.APISPORTS_NBA_URL ||
+  "https://v1.basketball.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const DEFAULT_SEASON =
-  process.env.APISPORTS_NBA_SEASON ??
   process.env.APISPORTS_BASKETBALL_SEASON ??
+  process.env.APISPORTS_NBA_SEASON ??
   "2025";
-const LEAGUE_ID = 1; // NBA on v2 api
+const LEAGUE_ID = 12; // NBA on basketball v1
 const MEMORY_CACHE_TTL_MS = 5 * 60 * 1000;
+const IS_BASKETBALL_V1 = API_BASE.includes("basketball");
 
 type ApiTeamSide = {
   id?: number | null;
@@ -105,6 +106,7 @@ function getTeamSides(g: ApiGame) {
 }
 
 async function resolveTeamIdForApi(teamId: number): Promise<number> {
+  if (IS_BASKETBALL_V1) return teamId;
   const code = CODE_BY_TEAM_ID[teamId];
   if (!code) return teamId;
   if (dynamicTeamIdCache.has(code)) return dynamicTeamIdCache.get(code)!;
@@ -304,10 +306,16 @@ export async function GET(
   try {
     const attempts: Array<{ url: string; results?: number; errors?: any }> = [];
     const seasonYear = season.match(/(\d{4})/)?.[1] ?? season;
+    const seasonSpan =
+      seasonYear && /^\d{4}$/.test(seasonYear)
+        ? `${seasonYear}-${Number(seasonYear) + 1}`
+        : null;
     const seasonInt =
       seasonYear && /^\d{4}$/.test(seasonYear) ? Number(seasonYear) : null;
     const targetSeason = seasonInt ? String(seasonInt) : season;
-    const seasonsToTry = [targetSeason];
+    const seasonsToTry = IS_BASKETBALL_V1
+      ? Array.from(new Set([seasonSpan, season, seasonYear])).filter(Boolean)
+      : [targetSeason];
 
     const requestedSeason = seasonsToTry[0];
     let gamesResponse: ApiGame[] = [];

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/nba/odds/sync-daily",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/nba/logs/refresh-yesterday",
+      "schedule": "20 13 * * *"
+    }
+  ]
+}

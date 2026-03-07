@@ -6,6 +6,34 @@ import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Shield, SlidersHorizontal, Sparkles } from "lucide-react";
 
 type OverviewRange = "Season" | "Last 5" | "Last 10";
+type DvpWindow = "season" | "L10" | "L5";
+type DvpPosition = "QB" | "RB" | "WR" | "TE";
+type DvpContext = "all" | "home" | "away";
+type DvpStatTotals = {
+  passYds: number;
+  passTD: number;
+  ints: number;
+  completions: number;
+  attempts: number;
+  rushYds: number;
+  rushTD: number;
+  rushAtt: number;
+  rec: number;
+  recYds: number;
+  recTD: number;
+  targets: number;
+};
+type DvpRow = {
+  season: string;
+  window: DvpWindow;
+  context: DvpContext;
+  teamId: number;
+  position: DvpPosition;
+  games: number;
+  ffpPerGame: number;
+  metrics: { perGame: DvpStatTotals };
+  rank?: number | null;
+};
 type PlayerStatsResponse =
   | {
       ok: true;
@@ -183,6 +211,57 @@ function buildSeasonAgg(stats: Record<string, Record<string, any>>) {
   };
 }
 
+function buildSeasonAvgFromStats(
+  stats: Record<string, Record<string, any>>,
+  totals: ReturnType<typeof buildSeasonAgg>,
+) {
+  const passYdsPerGame =
+    toNumber(pickStat(stats, "Passing", ["yards per game", "passing yards per game"])) ??
+    null;
+  const rushYdsPerGame =
+    toNumber(pickStat(stats, "Rushing", ["yards per game", "rushing yards per game"])) ??
+    null;
+  const recYdsPerGame =
+    toNumber(
+      pickStat(stats, "Receiving", ["yards per game", "receiving yards per game"]),
+    ) ?? null;
+
+  const estimates = [
+    passYdsPerGame && totals.passYds ? totals.passYds / passYdsPerGame : null,
+    rushYdsPerGame && totals.rushYds ? totals.rushYds / rushYdsPerGame : null,
+    recYdsPerGame && totals.recYds ? totals.recYds / recYdsPerGame : null,
+  ].filter((v): v is number => Number.isFinite(v ?? NaN) && v > 0);
+
+  if (!estimates.length) return null;
+  const sorted = [...estimates].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const games =
+    sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  if (!Number.isFinite(games) || games <= 0) return null;
+
+  const per = (val: number | null | undefined) =>
+    Number.isFinite(val ?? NaN) ? (val as number) / games : null;
+
+  return {
+    ...totals,
+    passYds: per(totals.passYds) ?? totals.passYds,
+    passTD: per(totals.passTD) ?? totals.passTD,
+    ints: per(totals.ints) ?? totals.ints,
+    rushYds: per(totals.rushYds) ?? totals.rushYds,
+    rushTD: per(totals.rushTD) ?? totals.rushTD,
+    cmp: per(totals.cmp) ?? totals.cmp,
+    att: per(totals.att) ?? totals.att,
+    rushAtt: per(totals.rushAtt) ?? totals.rushAtt,
+    rec: per(totals.rec ?? null) ?? totals.rec,
+    targets: per(totals.targets ?? null) ?? totals.targets,
+    recYds: per(totals.recYds ?? null) ?? totals.recYds,
+    recTD: per(totals.recTD ?? null) ?? totals.recTD,
+    yac: per(totals.yac ?? null) ?? totals.yac,
+    fumbles: per(totals.fumbles ?? null) ?? totals.fumbles,
+    fumblesLost: per(totals.fumblesLost ?? null) ?? totals.fumblesLost,
+  };
+}
+
 type StatTone = "amber" | "emerald" | "rose" | "sky" | "violet";
 
 function StatCard({
@@ -233,22 +312,23 @@ function StatCard({
     sky: "#38BDF8",
     violet: "#A78BFA",
   };
-  const glow = hexToRgba(toneHex[tone], 0.28);
-  const glowSoft = hexToRgba(toneHex[tone], 0.06);
+  const glow = hexToRgba(toneHex[tone], 0.2);
+  const glowSoft = hexToRgba(toneHex[tone], 0.08);
   return (
     <div
       className={
         "rounded-2xl " +
         (secondary
-          ? "px-2.5 py-1.5 bg-black/8 ring-1 ring-white/8"
-          : `px-3 py-3 ring-1 ${toneStyle.ring} min-h-[88px]`)
+          ? "px-2.5 py-1.5 bg-black/20 ring-1 ring-white/8"
+          : `px-3 py-3 bg-black/35 ring-1 ${toneStyle.ring} min-h-[88px]`)
       }
       style={
         secondary
-          ? undefined
+          ? {
+              backgroundImage: `linear-gradient(135deg, ${glowSoft}, rgba(3,3,7,0.25))`,
+            }
           : {
-              backgroundColor: "rgba(0,0,0,0.4)",
-              backgroundImage: `radial-gradient(circle at 50% 20%, ${glow} 0%, ${glowSoft} 42%, rgba(0,0,0,0) 70%)`,
+              backgroundImage: `linear-gradient(135deg, ${glow}, rgba(3,3,7,0.2))`,
             }
       }
     >
@@ -390,6 +470,8 @@ function getTeamAbbr(teamName: string | null | undefined) {
 type GameLogRow = {
   week: number;
   date: string;
+  stageType?: "regular" | "playoffs";
+  stageLabel?: string | null;
   homeAway: "vs" | "@";
   opp: string;
   result: string;
@@ -445,6 +527,7 @@ type MetricKey =
   | "ints"
   | "rushYds"
   | "rushTD"
+  | "rushAtt"
   | "rushLng"
   | "rec"
   | "tgts"
@@ -492,6 +575,105 @@ function lean(line: number, proj: number) {
   return edge > 0
     ? { label: "Lean Over", tone: "pos" as const }
     : { label: "Lean Under", tone: "neg" as const };
+}
+
+type GradeTone = "emerald" | "sky" | "amber" | "rose";
+
+function gradeFromScore(score: number) {
+  if (score >= 90) return { label: "A+", tone: "emerald" as const };
+  if (score >= 85) return { label: "A", tone: "emerald" as const };
+  if (score >= 80) return { label: "A-", tone: "emerald" as const };
+  if (score >= 75) return { label: "B+", tone: "sky" as const };
+  if (score >= 70) return { label: "B", tone: "sky" as const };
+  if (score >= 65) return { label: "B-", tone: "sky" as const };
+  if (score >= 60) return { label: "C+", tone: "amber" as const };
+  if (score >= 55) return { label: "C", tone: "amber" as const };
+  if (score >= 50) return { label: "C-", tone: "amber" as const };
+  if (score >= 40) return { label: "D", tone: "rose" as const };
+  return { label: "F", tone: "rose" as const };
+}
+
+type DvpMetricInfo = { key: keyof DvpStatTotals; label: string; proxy?: boolean };
+
+function dvpMetricInfoForTrend(metric: MetricKey): DvpMetricInfo | null {
+  if (metric === "passYds") return { key: "passYds", label: "Pass Yds" };
+  if (metric === "passTD") return { key: "passTD", label: "Pass TD" };
+  if (metric === "completions") return { key: "completions", label: "Cmp" };
+  if (metric === "attempts") return { key: "attempts", label: "Att" };
+  if (metric === "passLong") return { key: "passYds", label: "Pass Yds", proxy: true };
+  if (metric === "ints") return { key: "ints", label: "INT" };
+  if (metric === "rushYds") return { key: "rushYds", label: "Rush Yds" };
+  if (metric === "rushTD") return { key: "rushTD", label: "Rush TD" };
+  if (metric === "rushAtt") return { key: "rushAtt", label: "Rush Att" };
+  if (metric === "rushLng") return { key: "rushYds", label: "Rush Yds", proxy: true };
+  if (metric === "rec") return { key: "rec", label: "Rec" };
+  if (metric === "tgts") return { key: "targets", label: "Targets" };
+  if (metric === "recYds") return { key: "recYds", label: "Rec Yds" };
+  if (metric === "recTD") return { key: "recTD", label: "Rec TD" };
+  if (metric === "recLng") return { key: "recYds", label: "Rec Yds", proxy: true };
+  return null;
+}
+
+function resolveDvpValue(
+  perGame: DvpStatTotals,
+  key:
+    | keyof DvpStatTotals
+    | "passPct"
+    | "passYpa"
+    | "rushYpc"
+    | "recYpr"
+    | "recYpt",
+) {
+  const calcRatio = (num: number, den: number) => {
+    if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return null;
+    return num / den;
+  };
+  if (key === "passPct") {
+    const pct = calcRatio(perGame.completions, perGame.attempts);
+    return pct === null ? null : pct * 100;
+  }
+  if (key === "passYpa") {
+    return calcRatio(perGame.passYds, perGame.attempts);
+  }
+  if (key === "rushYpc") {
+    return calcRatio(perGame.rushYds, perGame.rushAtt);
+  }
+  if (key === "recYpr") {
+    return calcRatio(perGame.recYds, perGame.rec);
+  }
+  if (key === "recYpt") {
+    return calcRatio(perGame.recYds, perGame.targets);
+  }
+  return perGame[key as keyof DvpStatTotals];
+}
+
+function rankFromDvpRows(
+  rows: DvpRow[],
+  teamId: number,
+  key:
+    | keyof DvpStatTotals
+    | "passPct"
+    | "passYpa"
+    | "rushYpc"
+    | "recYpr"
+    | "recYpt",
+) {
+  const items = rows.map((row, idx) => {
+    const perGame = row.metrics?.perGame ?? ({} as DvpStatTotals);
+    const value = resolveDvpValue(perGame, key);
+    return { row, idx, value };
+  });
+  items.sort((a, b) => {
+    const av = Number.isFinite(a.value ?? NaN) ? Number(a.value) : null;
+    const bv = Number.isFinite(b.value ?? NaN) ? Number(b.value) : null;
+    if (av === null && bv === null) return a.idx - b.idx;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    if (av === bv) return a.idx - b.idx;
+    return av - bv;
+  });
+  const idx = items.findIndex((item) => item.row.teamId === teamId);
+  return idx >= 0 ? idx + 1 : null;
 }
 
 function buildLogAgg(rows: GameLogRow[]) {
@@ -679,6 +861,7 @@ function metricValue(g: GameLogRow, k: MetricKey) {
   if (k === "passLong") return Number(g.lng ?? 0);
   if (k === "rushYds") return Number(g.rushYds ?? 0);
   if (k === "rushTD") return Number(g.rushTd ?? 0);
+  if (k === "rushAtt") return Number(g.car ?? 0);
   if (k === "rushLng") return Number(g.rushLng ?? 0);
   if (k === "rec") return Number(g.rec ?? 0);
   if (k === "tgts") return Number(g.tgts ?? 0);
@@ -696,6 +879,7 @@ function marketForMetric(metric: MetricKey) {
   if (metric === "passLong") return "player_pass_longest_completion";
   if (metric === "ints") return "player_pass_interceptions";
   if (metric === "rushYds") return "player_rush_yds";
+  if (metric === "rushAtt") return "player_rush_attempts";
   if (metric === "rushLng") return "player_rush_longest";
   if (metric === "rec") return "player_receptions";
   if (metric === "recYds") return "player_reception_yds";
@@ -709,6 +893,7 @@ export default function PlayerPage() {
   const [data, setData] = useState<PlayerStatsResponse | null>(null);
   const [logFilter, setLogFilter] = useState<"All" | "Home" | "Away">("All");
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [showAllPlayoffLogs, setShowAllPlayoffLogs] = useState(false);
   const [logs, setLogs] = useState<GameLogRow[] | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -718,12 +903,26 @@ export default function PlayerPage() {
   const [windowKey, setWindowKey] = useState<"L3" | "L5" | "L10" | "2025">("L10");
   const [nextGame, setNextGame] = useState<NextGame | null>(null);
   const [nextGameLoading, setNextGameLoading] = useState(false);
+  const [dvpRow, setDvpRow] = useState<DvpRow | null>(null);
+  const [dvpTotalTeams, setDvpTotalTeams] = useState<number | null>(null);
+  const [dvpLoading, setDvpLoading] = useState(false);
+  const [dvpLeagueAvg, setDvpLeagueAvg] = useState<DvpStatTotals | null>(null);
+  const [dvpRowsForPosition, setDvpRowsForPosition] = useState<DvpRow[]>([]);
+  const [radarHover, setRadarHover] = useState<{
+    label: string;
+    hint?: string;
+    value: number;
+    leagueAvg: number;
+    x: number;
+    y: number;
+    size: number;
+  } | null>(null);
   const [oddsLine, setOddsLine] = useState<number | null>(null);
   const [oddsPrices, setOddsPrices] = useState<{ over?: number; under?: number } | null>(
     null,
   );
   const [oddsLoading, setOddsLoading] = useState(false);
-  const [oddsFormat, setOddsFormat] = useState<"american" | "decimal">("american");
+  const oddsFormat: "decimal" = "decimal";
   const oddsCacheRef = useRef(
     new Map<string, { line: number | null; prices?: { over?: number; under?: number } }>(),
   );
@@ -759,6 +958,21 @@ export default function PlayerPage() {
       }
       setLoading(true);
       setError(null);
+      setData(null);
+      setLogs(null);
+      setLogsLoading(false);
+      setNextGame(null);
+      setNextGameLoading(false);
+      setDvpRow(null);
+      setDvpTotalTeams(null);
+      setDvpLoading(false);
+      setDvpLeagueAvg(null);
+      setDvpRowsForPosition([]);
+      setOddsLine(null);
+      setOddsPrices(null);
+      setOddsLoading(false);
+      setEnrichedPlayer({});
+      setUseAvatarImage(false);
       try {
         const res = await fetch(
           `/api/nfl/players/${playerId}/statistics?season=${encodeURIComponent(season)}`,
@@ -818,7 +1032,16 @@ export default function PlayerPage() {
     return () => controller.abort();
   }, [data, playerId, season]);
 
-  const hasData = data && "ok" in data && data.ok === true;
+  const playerKey = playerId ? String(playerId) : "";
+  const dataOk = Boolean(data && "ok" in data && data.ok === true);
+  const dataPlayerKey =
+    dataOk && (data as any).player?.id !== null && (data as any).player?.id !== undefined
+      ? String((data as any).player.id)
+      : "";
+  const hasData = dataOk && playerKey !== "" && dataPlayerKey === playerKey;
+  const isStaleData =
+    dataOk && playerKey !== "" && dataPlayerKey !== "" && dataPlayerKey !== playerKey;
+  const showLoadingState = loading || isStaleData || (!data && !error);
   const stats = hasData ? (data as any).stats : {};
   const playerBase = hasData ? (data as any).player : null;
   const playerBaseAny = playerBase as any;
@@ -912,13 +1135,21 @@ export default function PlayerPage() {
   const agg = hasData ? buildSeasonAgg(stats) : null;
   const bzScore = hasData ? computeBzScore(stats) : null;
   const seasonLabel = `${season} Regular Season${player?.team?.name ? ` (${player.team.name})` : ""}`;
+  const playoffsLabel = `${season} Playoffs${player?.team?.name ? ` (${player.team.name})` : ""}`;
   const nextGameIsHome = nextGame?.teams?.home?.id === teamIdForLogs;
   const nextGameOpp = nextGameIsHome
     ? nextGame?.teams?.away?.name
     : nextGame?.teams?.home?.name;
+  const nextGameOppId = nextGameIsHome
+    ? nextGame?.teams?.away?.id
+    : nextGame?.teams?.home?.id;
   const nextGameOppLogo = nextGameIsHome
     ? nextGame?.teams?.away?.logo
     : nextGame?.teams?.home?.logo;
+  const oppPrimary = getTeamPrimaryColor(nextGameOpp ?? null);
+  const oppPrimarySoft = hexToRgba(oppPrimary, 0.16);
+  const oppPrimaryRing = hexToRgba(oppPrimary, 0.45);
+  const dvpContext: DvpContext = "all";
   const nextGameHomeAway = nextGame ? (nextGameIsHome ? "vs" : "@") : "";
   const nextGameDate = nextGame?.timestamp ? new Date(nextGame.timestamp * 1000) : null;
   const nextGameDateLabel = nextGameDate
@@ -975,6 +1206,23 @@ export default function PlayerPage() {
   const isWR = position.includes("WR");
   const isTE = position.includes("TE");
   const isQB = position.includes("QB");
+  const dvpPosition: DvpPosition | null = isQB
+    ? "QB"
+    : isRB
+      ? "RB"
+      : isTE
+        ? "TE"
+        : isWR
+      ? "WR"
+      : null;
+  const dvpPositionTone =
+    dvpPosition === "QB"
+      ? { ring: "ring-sky-500/35", text: "text-sky-200", hex: "#38BDF8" }
+      : dvpPosition === "RB"
+        ? { ring: "ring-amber-500/35", text: "text-amber-200", hex: "#F59E0B" }
+        : dvpPosition
+          ? { ring: "ring-violet-500/35", text: "text-violet-200", hex: "#A78BFA" }
+          : { ring: "ring-white/10", text: "text-slate-200", hex: "#94A3B8" };
   const metricCfg = useMemo(() => {
     if (isQB) {
       return [
@@ -991,6 +1239,7 @@ export default function PlayerPage() {
       return [
         { key: "rushYds", label: "RY" },
         { key: "rushTD", label: "RTD" },
+        { key: "rushAtt", label: "R ATT" },
         { key: "rushLng", label: "R LNG" },
         { key: "rec", label: "REC" },
         { key: "recYds", label: "REC YDS" },
@@ -1063,23 +1312,36 @@ export default function PlayerPage() {
       return (b.week ?? 0) - (a.week ?? 0);
     });
   }, [tableLogs]);
+  const regularLogs = useMemo(
+    () => sortedLogs.filter((g) => g.stageType !== "playoffs"),
+    [sortedLogs],
+  );
+  const playoffLogs = useMemo(
+    () => sortedLogs.filter((g) => g.stageType === "playoffs"),
+    [sortedLogs],
+  );
   const overviewIsSeason = overviewRange === "Season";
+  const dvpWindow: DvpWindow = "L10";
   const overviewRows = useMemo(() => {
     if (overviewIsSeason) return [];
     const count = overviewRange === "Last 5" ? 5 : 10;
-    return sortedLogs.filter((g) => !g.dnp).slice(0, count);
-  }, [overviewIsSeason, overviewRange, sortedLogs]);
+    return regularLogs.filter((g) => !g.dnp).slice(0, count);
+  }, [overviewIsSeason, overviewRange, regularLogs]);
   const seasonAggFromLogs = useMemo(() => {
-    if (!sortedLogs.length) return null;
-    return buildLogTotals(sortedLogs);
-  }, [sortedLogs]);
+    if (!regularLogs.length) return null;
+    return buildLogTotals(regularLogs);
+  }, [regularLogs]);
   const seasonGamesCount = useMemo(() => {
-    return sortedLogs.filter((g) => !g.dnp).length;
-  }, [sortedLogs]);
+    return regularLogs.filter((g) => !g.dnp).length;
+  }, [regularLogs]);
   const seasonAvgFromLogs = useMemo(() => {
-    if (!sortedLogs.length) return null;
-    return buildLogAgg(sortedLogs);
-  }, [sortedLogs]);
+    if (!regularLogs.length) return null;
+    return buildLogAgg(regularLogs);
+  }, [regularLogs]);
+  const seasonAvgFromStats = useMemo(() => {
+    if (!agg || !stats) return null;
+    return buildSeasonAvgFromStats(stats, agg);
+  }, [agg, stats]);
   const seasonAvgYac =
     agg?.yac !== null && agg?.yac !== undefined && seasonGamesCount
       ? agg.yac / seasonGamesCount
@@ -1087,7 +1349,7 @@ export default function PlayerPage() {
   const overviewAgg = overviewIsSeason
     ? seasonAvgFromLogs
       ? { ...seasonAvgFromLogs, yac: seasonAvgFromLogs.yac ?? seasonAvgYac ?? null }
-      : agg
+      : seasonAvgFromStats ?? agg
     : buildLogAgg(overviewRows);
   const totalsAgg = seasonAggFromLogs ?? agg;
   const miniStats = isRB
@@ -1122,6 +1384,206 @@ export default function PlayerPage() {
   };
   const formatPrimaryYards = formatPrimaryAverage;
   const formatPrimaryCount = formatPrimaryAverage;
+  const dvpPerGame = dvpRow?.metrics?.perGame;
+  const dvpTier =
+    dvpRow && Number.isFinite(dvpRow.rank ?? NaN)
+      ? dvpRow.rank! <= 5
+        ? { label: "Elite", ring: "ring-emerald-500/40", text: "text-emerald-200", hex: "#10B981", fill: "bg-emerald-500/60" }
+        : dvpRow.rank! <= 12
+          ? { label: "Solide", ring: "ring-sky-500/40", text: "text-sky-200", hex: "#38BDF8", fill: "bg-sky-500/60" }
+          : dvpRow.rank! <= 20
+            ? { label: "Moyenne", ring: "ring-amber-500/40", text: "text-amber-200", hex: "#F59E0B", fill: "bg-amber-500/60" }
+            : { label: "Faible", ring: "ring-rose-500/40", text: "text-rose-200", hex: "#FB7185", fill: "bg-rose-500/60" }
+      : { label: "—", ring: "ring-white/10", text: "text-slate-200", hex: "#94A3B8", fill: "bg-white/10" };
+  const dvpStrengthPct =
+    dvpRow && dvpTotalTeams && Number.isFinite(dvpRow.rank ?? NaN)
+      ? Math.round(((dvpTotalTeams - dvpRow.rank! + 1) / dvpTotalTeams) * 100)
+      : null;
+  const dvpRadarConfig = useMemo(() => {
+    if (!dvpPerGame || !dvpPosition || !dvpLeagueAvg) return null;
+    if (dvpPosition === "QB") {
+      return [
+        {
+          label: "PY",
+          value: dvpPerGame.passYds ?? 0,
+          leagueAvg: dvpLeagueAvg.passYds ?? 1,
+          hint: "Pass Yds",
+        },
+        {
+          label: "PTD",
+          value: dvpPerGame.passTD ?? 0,
+          leagueAvg: dvpLeagueAvg.passTD ?? 1,
+          hint: "Pass TD",
+        },
+        {
+          label: "INT",
+          value: dvpPerGame.ints ?? 0,
+          leagueAvg: dvpLeagueAvg.ints ?? 1,
+          hint: "INT",
+        },
+      ];
+    }
+    if (dvpPosition === "RB") {
+      return [
+        {
+          label: "RY",
+          value: dvpPerGame.rushYds ?? 0,
+          leagueAvg: dvpLeagueAvg.rushYds ?? 1,
+          hint: "Rush Yds",
+        },
+        {
+          label: "RTD",
+          value: dvpPerGame.rushTD ?? 0,
+          leagueAvg: dvpLeagueAvg.rushTD ?? 1,
+          hint: "Rush TD",
+        },
+        {
+          label: "REC",
+          value: dvpPerGame.rec ?? 0,
+          leagueAvg: dvpLeagueAvg.rec ?? 1,
+          hint: "Rec",
+        },
+      ];
+    }
+    return [
+      {
+        label: "REC",
+        value: dvpPerGame.rec ?? 0,
+        leagueAvg: dvpLeagueAvg.rec ?? 1,
+        hint: "Rec",
+      },
+      {
+        label: "RYD",
+        value: dvpPerGame.recYds ?? 0,
+        leagueAvg: dvpLeagueAvg.recYds ?? 1,
+        hint: "Rec Yds",
+      },
+      {
+        label: "TD",
+        value: dvpPerGame.recTD ?? 0,
+        leagueAvg: dvpLeagueAvg.recTD ?? 1,
+        hint: "Rec TD",
+      },
+    ];
+  }, [dvpPerGame, dvpPosition, dvpLeagueAvg]);
+  const dvpRadar = useMemo(() => {
+    if (!dvpRadarConfig) return null;
+    const size = 84;
+    const center = 42;
+    const radius = 28;
+    const points = dvpRadarConfig.map((m, idx) => {
+      const angle = -Math.PI / 2 + (idx * (2 * Math.PI)) / dvpRadarConfig.length;
+      const ratio =
+        m.leagueAvg && Number.isFinite(m.leagueAvg) ? m.value / m.leagueAvg : 0;
+      const value = clamp(ratio, 0.5, 1.5) / 1.5;
+      const r = radius * value;
+      return {
+        x: center + r * Math.cos(angle),
+        y: center + r * Math.sin(angle),
+        angle,
+        label: m.label,
+        hint: m.hint,
+        value: m.value,
+        leagueAvg: m.leagueAvg,
+      };
+    });
+    const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
+    return { size, center, radius, points, polygon };
+  }, [dvpRadarConfig]);
+  const dvpRadarNote = dvpLeagueAvg ? "Profil vs moyenne ligue" : "Profil DvP";
+  const dvpRankValue = dvpLoading
+    ? "Chargement..."
+    : dvpRow && Number.isFinite(dvpRow.rank ?? NaN)
+      ? `Rang ${dvpRow.rank}${dvpTotalTeams ? `/${dvpTotalTeams}` : ""}`
+      : "N/A";
+  const dvpBtpValue = dvpLoading
+    ? "—"
+    : dvpRow
+      ? formatPrimaryAverage(dvpRow.ffpPerGame)
+      : "N/A";
+  const dvpInsights = useMemo(() => {
+    if (!dvpPerGame || !dvpLeagueAvg || !dvpPosition || !dvpRow) return null;
+    const teamId = dvpRow.teamId;
+    const pool =
+      dvpPosition === "QB"
+        ? [
+            { key: "passYds", label: "Pass Yds" },
+            { key: "completions", label: "Cmp" },
+            { key: "attempts", label: "Att" },
+            { key: "passTD", label: "Pass TD" },
+            { key: "rushYds", label: "Rush Yds" },
+            { key: "rushTD", label: "Rush TD" },
+          ]
+        : dvpPosition === "RB"
+          ? [
+              { key: "rushYds", label: "Rush Yds" },
+              { key: "rushTD", label: "Rush TD" },
+              { key: "rec", label: "Rec" },
+              { key: "recYds", label: "Rec Yds" },
+            ]
+          : [
+              { key: "rec", label: "Rec" },
+              { key: "recYds", label: "Rec Yds" },
+              { key: "recTD", label: "Rec TD" },
+              { key: "targets", label: "Targets" },
+            ];
+    const rankForMetric = (key: string) => {
+      if (!dvpRowsForPosition.length) return null;
+      return rankFromDvpRows(dvpRowsForPosition, teamId, key as any);
+    };
+    const items = pool
+      .map((m) => {
+        const value = (dvpPerGame as any)[m.key];
+        const base = (dvpLeagueAvg as any)[m.key];
+        if (!Number.isFinite(value ?? NaN) || !Number.isFinite(base ?? NaN) || base === 0) {
+          return null;
+        }
+        const delta = (Number(value) - Number(base)) / Number(base);
+        return {
+          ...m,
+          delta,
+          value: Number(value),
+          leagueAvg: Number(base),
+          rank: rankForMetric(m.key),
+        };
+      })
+      .filter(Boolean) as Array<{
+      key: string;
+      label: string;
+      delta: number;
+      value: number;
+      rank: number | null;
+      leagueAvg: number;
+    }>;
+    if (!items.length) return null;
+    const threshold = 0.07;
+    const positives = [...items].filter((item) => item.delta > 0).sort((a, b) => b.delta - a.delta);
+    const negatives = [...items].filter((item) => item.delta < 0).sort((a, b) => a.delta - b.delta);
+    let strengths = negatives.filter((item) => item.delta <= -threshold).slice(0, 2);
+    if (strengths.length === 0 && negatives.length) {
+      strengths = negatives.slice(0, 1);
+    }
+    const strengthKeys = new Set(strengths.map((item) => item.key));
+    let weaknesses = positives
+      .filter((item) => item.delta >= threshold)
+      .slice(0, 2)
+      .filter((item) => !strengthKeys.has(item.key));
+    if (weaknesses.length === 0) {
+      weaknesses = positives.filter((item) => !strengthKeys.has(item.key)).slice(0, 1);
+    }
+    const dedupe = (list: typeof items) => {
+      const seen = new Set<string>();
+      return list.filter((item) => {
+        if (seen.has(item.key)) return false;
+        seen.add(item.key);
+        return true;
+      });
+    };
+    return {
+      weaknesses: dedupe(weaknesses).slice(0, 2),
+      strengths: dedupe(strengths).slice(0, 2),
+    };
+  }, [dvpPerGame, dvpLeagueAvg, dvpPosition, dvpRow, dvpRowsForPosition]);
   const formatTrendValue = (val: number) =>
     val.toLocaleString("fr-CA", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const formatOddsPrice = (val?: number | null) => {
@@ -1197,8 +1659,81 @@ export default function PlayerPage() {
     );
     return pctHit(base, lineForMetric);
   }, [trendOpp, trendLogsAll, metric, lineForMetric]);
+  const noteLogs = useMemo(() => trendLogsAll.slice(0, 10), [trendLogsAll]);
+  const noteAvg = useMemo(() => {
+    const base = noteLogs.map((g) => metricValue(g, metric)).filter((v) => Number.isFinite(v));
+    if (!base.length) return null;
+    return round1(avg(base));
+  }, [noteLogs, metric]);
+  const noteHitPct = useMemo(
+    () => pctHit(noteLogs.map((g) => metricValue(g, metric)), lineForMetric),
+    [noteLogs, metric, lineForMetric],
+  );
+  const dvpMetricInfo = useMemo(() => dvpMetricInfoForTrend(metric), [metric]);
+  const dvpMetricRank = useMemo(() => {
+    if (!dvpMetricInfo || !dvpRow || !dvpRowsForPosition.length) return null;
+    return rankFromDvpRows(dvpRowsForPosition, dvpRow.teamId, dvpMetricInfo.key);
+  }, [dvpMetricInfo, dvpRow, dvpRowsForPosition]);
+  const dvpMetricDelta = useMemo(() => {
+    if (!dvpMetricInfo || !dvpRow || !dvpLeagueAvg) return null;
+    const oppVal = (dvpRow.metrics?.perGame as any)?.[dvpMetricInfo.key];
+    const leagueVal = (dvpLeagueAvg as any)?.[dvpMetricInfo.key];
+    if (!Number.isFinite(oppVal ?? NaN) || !Number.isFinite(leagueVal ?? NaN) || !leagueVal) {
+      return null;
+    }
+    return (Number(oppVal) - Number(leagueVal)) / Number(leagueVal);
+  }, [dvpMetricInfo, dvpRow, dvpLeagueAvg]);
+  const dvpMetricFlag = useMemo(() => {
+    if (dvpMetricDelta === null) return null;
+    if (dvpMetricDelta >= 0.07) return "weakness";
+    if (dvpMetricDelta <= -0.07) return "strength";
+    return "neutral";
+  }, [dvpMetricDelta]);
+  const trendNote = useMemo(() => {
+    if (!Number.isFinite(noteAvg ?? NaN) || !Number.isFinite(lineForMetric ?? NaN)) return null;
+    const line = Number(lineForMetric);
+    const lineEdge =
+      line > 0 ? clamp(((noteAvg - line) / line) * 40, -20, 20) : 0;
+    const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 40, -20, 20);
+    const rankEdge =
+      dvpMetricRank && dvpTotalTeams
+        ? clamp(
+            ((dvpMetricRank - (dvpTotalTeams + 1) / 2) / ((dvpTotalTeams - 1) / 2)) * 20,
+            -20,
+            20,
+          )
+        : 0;
+    const strengthEdge =
+      dvpMetricFlag === "weakness" ? 8 : dvpMetricFlag === "strength" ? -8 : 0;
+    const rawScore = 50 + lineEdge + hitEdge + rankEdge + strengthEdge;
+    const score = Math.round(clamp(rawScore, 0, 100));
+    const grade = gradeFromScore(score);
+    const lineDeltaPct =
+      line > 0 ? Math.round(((noteAvg - line) / line) * 100) : null;
+    return {
+      score,
+      grade,
+      lineDeltaPct,
+    };
+  }, [noteAvg, lineForMetric, noteHitPct, dvpMetricRank, dvpTotalTeams, dvpMetricFlag]);
+  const gradeToneStyles: Record<GradeTone, string> = {
+    emerald: "bg-emerald-500/15 text-emerald-200 ring-emerald-400/40",
+    sky: "bg-sky-500/15 text-sky-200 ring-sky-400/40",
+    amber: "bg-amber-500/15 text-amber-200 ring-amber-400/40",
+    rose: "bg-rose-500/15 text-rose-200 ring-rose-400/40",
+  };
+  const gradeToneHex: Record<GradeTone, string> = {
+    emerald: "#10B981",
+    sky: "#38BDF8",
+    amber: "#F59E0B",
+    rose: "#FB7185",
+  };
+  const windowLabel = "L10";
+  const dvpMetricLabel = dvpMetricInfo
+    ? `${dvpMetricInfo.label}${dvpMetricInfo.proxy ? " ≈" : ""}`
+    : null;
   const logsUnavailableReason =
-    Array.isArray(logs) && logs.length === 0
+    Array.isArray(logs) && regularLogs.length === 0
       ? "Aucun game log disponible pour la regular season."
       : null;
 
@@ -1224,6 +1759,8 @@ export default function PlayerPage() {
           ? json.logs.map((g: any) => ({
               week: g.week ?? 0,
               date: g.date ?? "",
+              stageType: g.stageType === "playoffs" ? "playoffs" : "regular",
+              stageLabel: g.stageLabel ?? null,
               homeAway: g.homeAway === "vs" ? "vs" : "@",
               opp: g.opp ?? "OPP",
               result: g.result ?? "—",
@@ -1327,9 +1864,296 @@ export default function PlayerPage() {
     return () => controller.abort();
   }, [season, teamIdForLogs]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchDvp = async () => {
+      if (!dvpPosition || !nextGameOppId) {
+        setDvpRow(null);
+        setDvpTotalTeams(null);
+        setDvpLoading(false);
+        return;
+      }
+      setDvpLoading(true);
+      try {
+        const url = new URL("/api/nfl/defense/dvp", window.location.origin);
+        url.searchParams.set("season", season);
+        url.searchParams.set("window", dvpWindow);
+        url.searchParams.set("position", dvpPosition);
+        url.searchParams.set("context", dvpContext);
+        const res = await fetch(url.toString(), { signal: controller.signal });
+        if (!res.ok) {
+          setDvpRow(null);
+          setDvpTotalTeams(null);
+          return;
+        }
+        const json = await res.json();
+        const rows: DvpRow[] = Array.isArray(json?.rows) ? json.rows : [];
+        const match = rows.find((row) => Number(row.teamId) === Number(nextGameOppId));
+        if (rows.length) {
+          const totals: DvpStatTotals = {
+            passYds: 0,
+            passTD: 0,
+            ints: 0,
+            completions: 0,
+            attempts: 0,
+            rushYds: 0,
+            rushTD: 0,
+            rushAtt: 0,
+            rec: 0,
+            recYds: 0,
+            recTD: 0,
+            targets: 0,
+          };
+          let totalGames = 0;
+          rows.forEach((row) => {
+            const per = row.metrics?.perGame;
+            if (!per) return;
+            const games = Number(row.games) || 0;
+            const weight = games > 0 ? games : 1;
+            totalGames += weight;
+            totals.passYds += (per.passYds ?? 0) * weight;
+            totals.passTD += (per.passTD ?? 0) * weight;
+            totals.ints += (per.ints ?? 0) * weight;
+            totals.completions += (per.completions ?? 0) * weight;
+            totals.attempts += (per.attempts ?? 0) * weight;
+            totals.rushYds += (per.rushYds ?? 0) * weight;
+            totals.rushTD += (per.rushTD ?? 0) * weight;
+            totals.rushAtt += (per.rushAtt ?? 0) * weight;
+            totals.rec += (per.rec ?? 0) * weight;
+            totals.recYds += (per.recYds ?? 0) * weight;
+            totals.recTD += (per.recTD ?? 0) * weight;
+            totals.targets += (per.targets ?? 0) * weight;
+          });
+          const avg = totalGames
+            ? {
+                passYds: totals.passYds / totalGames,
+                passTD: totals.passTD / totalGames,
+                ints: totals.ints / totalGames,
+                completions: totals.completions / totalGames,
+                attempts: totals.attempts / totalGames,
+                rushYds: totals.rushYds / totalGames,
+                rushTD: totals.rushTD / totalGames,
+                rushAtt: totals.rushAtt / totalGames,
+                rec: totals.rec / totalGames,
+                recYds: totals.recYds / totalGames,
+                recTD: totals.recTD / totalGames,
+                targets: totals.targets / totalGames,
+              }
+            : null;
+          setDvpLeagueAvg(avg);
+        } else {
+          setDvpLeagueAvg(null);
+        }
+        setDvpRowsForPosition(rows);
+        setDvpTotalTeams(rows.length || null);
+        setDvpRow(match ?? null);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setDvpRow(null);
+        setDvpTotalTeams(null);
+        setDvpLeagueAvg(null);
+        setDvpRowsForPosition([]);
+      } finally {
+        if (!controller.signal.aborted) setDvpLoading(false);
+      }
+    };
+    fetchDvp();
+    return () => controller.abort();
+  }, [season, dvpWindow, dvpPosition, dvpContext, nextGameOppId]);
+
   const oddsMarketKey = useMemo(() => marketForMetric(metric), [metric]);
   const nextGameHome = nextGame?.teams?.home?.name ?? null;
   const nextGameAway = nextGame?.teams?.away?.name ?? null;
+
+  const renderLogsTable = (
+    rows: GameLogRow[],
+    showAll: boolean,
+    setShowAll: (value: boolean | ((prev: boolean) => boolean)) => void,
+    label: string,
+  ) => {
+    const filteredRows = rows.filter((g) => {
+      if (logFilter === "All") return true;
+      return logFilter === "Home" ? g.homeAway === "vs" : g.homeAway === "@";
+    });
+    const visibleRows = filteredRows.slice(showAll ? undefined : 0, showAll ? undefined : 5);
+    return (
+      <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-[#0b070f]">
+        <div className="overflow-x-hidden">
+          <table className="w-full table-fixed text-left text-[10px] tabular-nums">
+            <colgroup>
+              {baseColumns.map((col, idx) => (
+                <col key={col.key} style={{ width: baseColWidths[idx] ?? "12%" }} />
+              ))}
+              {statColumns.map((col) => (
+                <col key={col.id} style={{ width: statColWidth }} />
+              ))}
+            </colgroup>
+            <thead className="bg-black/30 uppercase tracking-[0.18em] text-slate-400">
+              <tr className="text-[9px]">
+                <th
+                  colSpan={baseColumns.length}
+                  className="px-2 py-2 text-left font-semibold text-slate-300"
+                >
+                  {label}
+                </th>
+                {statGroups.map((group, groupIndex) => (
+                  <th
+                    key={group.label}
+                    colSpan={group.columns.length}
+                    className={`px-2 py-2 text-center font-semibold text-slate-300 ${
+                      groupIndex > 0 ? "border-l border-white/10" : ""
+                    }`}
+                  >
+                    {group.label}
+                  </th>
+                ))}
+              </tr>
+              <tr className="text-[9px]">
+                {baseColumns.map((col) => (
+                  <th
+                    key={col.key}
+                    className="relative cursor-default px-2 py-1 group"
+                    title={col.full}
+                  >
+                    <span>{col.label}</span>
+                    <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden -translate-x-1/2 rounded-md bg-black/90 px-2 py-1 text-[10px] text-amber-100 ring-1 ring-white/10 group-hover:block">
+                      {col.full}
+                    </span>
+                  </th>
+                ))}
+                {statColumns.map((col) => (
+                  <th
+                    key={col.id}
+                    className={`relative cursor-default px-1.5 py-1 group ${
+                      col.isGroupStart && col.groupIndex > 0 ? "border-l border-white/10" : ""
+                    }`}
+                    title={col.full}
+                  >
+                    <span>{col.label}</span>
+                    <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden -translate-x-1/2 rounded-md bg-black/90 px-2 py-1 text-[10px] text-amber-100 ring-1 ring-white/10 group-hover:block">
+                      {col.full}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10 text-slate-200">
+              {visibleRows.map((g) => {
+                const isDnp = Boolean(g.dnp);
+                const valueOrDash = (val: any) =>
+                  val === null || val === undefined || val === "" ? "—" : val;
+                const cmpPct = isDnp ? "—" : g.att ? ((g.cmp / g.att) * 100).toFixed(1) : "—";
+                const avg = isDnp ? "—" : Number.isFinite(g.avg) ? g.avg.toFixed(1) : "—";
+                const rAvg = isDnp ? "—" : Number.isFinite(g.rushAvg) ? g.rushAvg.toFixed(1) : "—";
+                const recAvg = isDnp
+                  ? "—"
+                  : Number.isFinite(g.recAvg)
+                    ? g.recAvg.toFixed(1)
+                    : g.rec
+                      ? (g.recYds / g.rec).toFixed(1)
+                      : "—";
+                const rtg = isDnp ? "—" : Number.isFinite(g.rtg) ? g.rtg.toFixed(1) : "—";
+                const dateValue =
+                  typeof g.date === "string" ? g.date : g.date ? String(g.date) : "";
+                const parsedDate =
+                  dateValue && !dateValue.includes(" ")
+                    ? new Date(dateValue).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : dateValue;
+                const oppLabel = g.opp ?? "OPP";
+                const statValues: Record<string, string | number> = {
+                  cmp: isDnp ? "—" : valueOrDash(g.cmp),
+                  att: isDnp ? "—" : valueOrDash(g.att),
+                  passYds: isDnp ? "—" : valueOrDash(g.yds),
+                  cmpPct,
+                  passAvg: avg,
+                  passTd: isDnp ? "—" : valueOrDash(g.td),
+                  passInt: isDnp ? "—" : valueOrDash(g.ints),
+                  passLng: isDnp ? "—" : valueOrDash(g.lng),
+                  passSack: isDnp ? "—" : valueOrDash(g.sack),
+                  passRtg: rtg,
+                  rushCar: isDnp ? "—" : valueOrDash(g.car),
+                  rushYds: isDnp ? "—" : valueOrDash(g.rushYds),
+                  rushAvg: rAvg,
+                  rushTd: isDnp ? "—" : valueOrDash(g.rushTd),
+                  rushLng: isDnp ? "—" : valueOrDash(g.rushLng),
+                  rec: isDnp ? "—" : valueOrDash(g.rec),
+                  tgts: isDnp ? "—" : valueOrDash(g.tgts),
+                  recYds: isDnp ? "—" : valueOrDash(g.recYds),
+                  recAvg,
+                  recTd: isDnp ? "—" : valueOrDash(g.recTd),
+                  recLng: isDnp ? "—" : valueOrDash(g.recLng),
+                  fum: isDnp ? "—" : valueOrDash(g.fum),
+                  lst: isDnp ? "—" : valueOrDash(g.lst),
+                  ff: isDnp ? "—" : valueOrDash(g.ff),
+                  kb: isDnp ? "—" : valueOrDash(g.kb),
+                };
+                const weekLabel = (() => {
+                  if (typeof g.week === "number" && Number.isFinite(g.week)) return `W${g.week}`;
+                  if (typeof g.week === "string") {
+                    const match = g.week.match(/\d+/);
+                    return match ? `W${match[0]}` : g.week;
+                  }
+                  return "—";
+                })();
+                const resultClass = isDnp
+                  ? "text-slate-400"
+                  : g.result?.startsWith("W")
+                    ? "text-emerald-300"
+                    : "text-rose-300";
+                return (
+                  <tr key={`${label}-${g.week}-${dateValue}-${g.opp}`} className="hover:bg-white/5">
+                    <td className="px-2 py-1 text-slate-300">
+                      <div className="leading-tight">
+                        <div>{parsedDate || "—"}</div>
+                        <div className="text-[9px] text-slate-500">{weekLabel}</div>
+                      </div>
+                    </td>
+                    <td
+                      className="px-2 py-1 text-slate-300 truncate"
+                      title={`${g.homeAway} ${oppLabel}`}
+                    >
+                      {g.homeAway} {oppLabel}
+                    </td>
+                    <td className={`px-2 py-1 font-semibold ${resultClass}`}>
+                      <span>{g.result ?? "—"}</span>
+                      {isDnp && <span className="ml-2 text-[10px] text-slate-500">DNP</span>}
+                    </td>
+                    {statColumns.map((col) => (
+                      <td
+                        key={`${label}-${g.week}-${col.id}`}
+                        className={`px-1.5 py-1 ${
+                          col.isGroupStart && col.groupIndex > 0
+                            ? "border-l border-white/10"
+                            : ""
+                        }`}
+                      >
+                        {statValues[col.key] ?? "—"}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+              {filteredRows.length > 5 && (
+                <tr className="bg-black/20">
+                  <td colSpan={baseColumns.length + statColumns.length} className="px-2 py-3 text-center">
+                    <button
+                      onClick={() => setShowAll((prev) => !prev)}
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-[11px] text-amber-100 transition hover:border-amber-400/40"
+                    >
+                      {showAll ? "Afficher moins" : "Afficher plus"}
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1428,6 +2252,14 @@ export default function PlayerPage() {
           </div>
         </header>
 
+        {showLoadingState || !hasData ? (
+          <div className="mt-6 rounded-3xl border border-white/10 bg-[#0b090f] p-6 text-center text-sm text-slate-400">
+            {showLoadingState
+              ? "Chargement des statistiques..."
+              : error ?? "Statistiques indisponibles."}
+          </div>
+        ) : (
+          <>
         {/* HERO + SCORE */}
         <section
           className="mt-4 rounded-3xl border border-white/10 bg-[#0b090f] p-3 shadow-lg shadow-black/30"
@@ -1726,7 +2558,7 @@ export default function PlayerPage() {
                         k: "YAC",
                         v:
                           overviewIsSeason && overviewAgg?.yac !== null && overviewAgg?.yac !== undefined
-                            ? formatNumber(overviewAgg.yac)
+                            ? toNumber(overviewAgg.yac)?.toFixed(1) ?? "—"
                             : "—",
                         hint: "Yards after catch par match.",
                         secondary: true,
@@ -1819,7 +2651,7 @@ export default function PlayerPage() {
                 Matchup & contexte
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Données matchup non disponibles via l&apos;API (placeholder).
+                DvP disponible, autres données matchup à venir.
               </p>
             </div>
             <span className="rounded-full bg-amber-500/15 px-3 py-1 text-[11px] text-amber-200 ring-1 ring-amber-400/40">
@@ -1828,8 +2660,20 @@ export default function PlayerPage() {
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <div className="rounded-2xl bg-black/35 px-3 py-2 ring-1 ring-white/10">
-              <p className="text-[10px] text-slate-500">Prochain match</p>
+            <div
+              className="rounded-2xl bg-black/35 px-3 py-2 border"
+              style={{
+                borderColor: oppPrimaryRing,
+                background: `linear-gradient(135deg, ${oppPrimarySoft}, rgba(3, 3, 7, 0.15))`,
+              }}
+            >
+              <p className="flex items-center gap-1 text-[10px] text-slate-400">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: oppPrimary }}
+                />
+                Prochain match
+              </p>
               {nextGameLoading ? (
                 <p className="text-sm font-semibold text-slate-400">Chargement…</p>
               ) : nextGame ? (
@@ -1839,7 +2683,10 @@ export default function PlayerPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={nextGameOppLogo} alt="" className="h-6 w-6" />
                     )}
-                    <p className="text-sm font-semibold text-slate-100">
+                    <p
+                      className="text-sm font-semibold text-slate-100"
+                      style={{ textShadow: `0 0 12px ${hexToRgba(oppPrimary, 0.35)}` }}
+                    >
                       {nextGameHomeAway} {nextGameOpp ?? "—"}
                     </p>
                     <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 ring-1 ring-white/10">
@@ -1862,20 +2709,246 @@ export default function PlayerPage() {
               )}
             </div>
 
-            <div className="rounded-2xl bg-black/35 px-3 py-2 ring-1 ring-emerald-500/25">
+            <div
+              className={`rounded-2xl bg-black/35 px-3 py-2 ring-1 ${dvpTier.ring}`}
+              style={{
+                background: `linear-gradient(135deg, ${hexToRgba(
+                  dvpTier.hex,
+                  0.16,
+                )}, rgba(3, 3, 7, 0.2))`,
+              }}
+            >
               <div className="flex items-center justify-between">
-                <p className="text-[10px] text-slate-500">Defense vs QB</p>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-200 ring-1 ring-emerald-500/30">
-                  <Shield className="h-3 w-3" />
-                  DvP
-                </span>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] text-slate-500">
+                    Defense {getTeamAbbr(nextGameOpp ?? "")} vs {dvpPosition ?? "—"}
+                  </p>
+                  <span
+                    className={`rounded-full bg-black/40 px-2 py-0.5 text-[9px] ${dvpTier.text} ring-1 ${dvpTier.ring}`}
+                  >
+                    {dvpTier.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/nfl?section=defense"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-amber-200 ring-1 ring-amber-400/30 hover:bg-white/10"
+                  >
+                    Voir DvP
+                    <ArrowUpRight className="h-3 w-3" />
+                  </Link>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[10px] ${dvpTier.text} ring-1 ${dvpTier.ring}`}
+                  >
+                    <Shield className="h-3 w-3" />
+                    DvP
+                  </span>
+                </div>
               </div>
-              <p className="text-sm font-semibold text-emerald-200">N/A</p>
+              <div className="mt-2 flex items-center gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className={`text-base font-semibold ${dvpTier.text}`}>
+                      {dvpRankValue}
+                    </p>
+                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-slate-300 ring-1 ring-white/10">
+                      {dvpStrengthPct !== null ? `Top ${dvpStrengthPct}%` : "—"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500">BTP/G {dvpBtpValue}</p>
+                </div>
+                <div className="ml-auto">
+                  {dvpRadar ? (
+                    <div
+                      className="relative"
+                      style={{ width: dvpRadar.size, height: dvpRadar.size }}
+                    >
+                      <svg
+                        width={dvpRadar.size}
+                        height={dvpRadar.size}
+                        viewBox={`0 0 ${dvpRadar.size} ${dvpRadar.size}`}
+                        className="overflow-visible rounded-full bg-black/40 ring-1 ring-white/10"
+                      >
+                      {[0.33, 0.66, 1].map((step) => (
+                        <circle
+                          key={step}
+                          cx={dvpRadar.center}
+                          cy={dvpRadar.center}
+                          r={dvpRadar.radius * step}
+                          stroke="rgba(148, 163, 184, 0.2)"
+                          strokeWidth="1"
+                          fill="none"
+                        />
+                      ))}
+                      {dvpRadar.points.map((pt, idx) => (
+                        <line
+                          key={pt.label}
+                          x1={dvpRadar.center}
+                          y1={dvpRadar.center}
+                          x2={pt.x}
+                          y2={pt.y}
+                          stroke="rgba(148, 163, 184, 0.3)"
+                          strokeWidth="1"
+                        />
+                      ))}
+                      <polygon
+                        points={dvpRadar.polygon}
+                        fill={hexToRgba("#38BDF8", 0.28)}
+                        stroke="#38BDF8"
+                        strokeWidth="2.6"
+                        style={{ filter: "drop-shadow(0 0 6px rgba(56,189,248,0.6))" }}
+                      />
+                      {dvpRadar.points.map((pt) => (
+                        <circle
+                          key={`${pt.label}-dot`}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="3.3"
+                          fill="#38BDF8"
+                          onMouseEnter={() =>
+                            setRadarHover({
+                              label: pt.label,
+                              hint: pt.hint,
+                              value: pt.value,
+                              leagueAvg: pt.leagueAvg,
+                              x: pt.x,
+                              y: pt.y,
+                              size: dvpRadar.size,
+                            })
+                          }
+                          onMouseLeave={() => setRadarHover(null)}
+                        />
+                      ))}
+                      {dvpRadar.points.map((pt) => {
+                        const labelRadius = dvpRadar.radius + 6;
+                        const lx = dvpRadar.center + labelRadius * Math.cos(pt.angle);
+                        const ly = dvpRadar.center + labelRadius * Math.sin(pt.angle);
+                        const anchor =
+                          Math.abs(Math.cos(pt.angle)) < 0.25
+                            ? "middle"
+                            : Math.cos(pt.angle) > 0
+                              ? "start"
+                              : "end";
+                        const dy = Math.sin(pt.angle) > 0.25 ? 4 : Math.sin(pt.angle) < -0.25 ? -2 : 1;
+                        return (
+                          <text
+                            key={`${pt.label}-label`}
+                            x={lx}
+                            y={ly}
+                            textAnchor={anchor}
+                            dominantBaseline="middle"
+                            fontSize="8"
+                            fill="rgba(226, 232, 240, 0.7)"
+                            dy={dy}
+                          >
+                            {pt.label}
+                          </text>
+                        );
+                      })}
+                    </svg>
+                      {radarHover && radarHover.size === dvpRadar.size && (
+                        <div
+                          className="pointer-events-none absolute z-10 translate-x-3 -translate-y-1/2 rounded-md bg-black/90 px-2 py-1 text-[10px] text-slate-100 ring-1 ring-white/10"
+                          style={{
+                            left: `${(radarHover.x / radarHover.size) * 100}%`,
+                            top: `${(radarHover.y / radarHover.size) * 100}%`,
+                          }}
+                        >
+                          <div className="font-semibold text-amber-100">
+                            {radarHover.hint ?? radarHover.label}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-slate-300">
+                            <span>Def {formatPrimaryAverage(radarHover.value)}/m</span>
+                            <span className="text-slate-600">•</span>
+                            <span>Ligue {formatPrimaryAverage(radarHover.leagueAvg)}/m</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-[84px] w-[84px] items-center justify-center rounded-full bg-black/40 text-[10px] text-slate-500 ring-1 ring-white/10">
+                      —
+                    </div>
+                  )}
+                  <p className="mt-1 text-center text-[9px] text-slate-500">
+                    {dvpRadarNote}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="rounded-2xl bg-black/35 px-3 py-2 ring-1 ring-amber-400/25">
-              <p className="text-[10px] text-slate-500">Pass Yds concédés</p>
-              <p className="text-sm font-semibold text-amber-200">N/A</p>
+            <div
+              className="rounded-2xl bg-black/35 px-3 py-2 ring-1 ring-violet-500/30"
+              style={{
+                background: `linear-gradient(135deg, ${hexToRgba("#A78BFA", 0.14)}, rgba(3, 3, 7, 0.2))`,
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-slate-500">
+                  {getTeamAbbr(nextGameOpp ?? "")} · Meilleur / moins bon contre
+                </p>
+                <span className="text-[9px] text-slate-400">vs ligue</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                <div>
+                  <p className="text-[9px] text-rose-200">Moins bon contre</p>
+                  <div className="mt-1 flex flex-col gap-1">
+                    {dvpInsights?.weaknesses?.length ? (
+                      dvpInsights.weaknesses.map((item) => (
+                        <div
+                          key={`weak-${item.key}`}
+                          className="rounded-xl bg-white/5 px-2 py-1 text-[10px] text-slate-200 ring-1 ring-white/10"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{item.label}</span>
+                            <span className="text-rose-200">
+                              {item.rank ? `#${item.rank}` : "—"}
+                              {dvpTotalTeams ? `/${dvpTotalTeams}` : ""}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center justify-between text-[9px] text-slate-500">
+                            <span>Def {formatPrimaryAverage(item.value)}/m</span>
+                            <span>Ligue {formatPrimaryAverage(item.leagueAvg)}/m</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-500 ring-1 ring-white/10">
+                        —
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[9px] text-emerald-200">Meilleur contre</p>
+                  <div className="mt-1 flex flex-col gap-1">
+                    {dvpInsights?.strengths?.length ? (
+                      dvpInsights.strengths.map((item) => (
+                        <div
+                          key={`strong-${item.key}`}
+                          className="rounded-xl bg-white/5 px-2 py-1 text-[10px] text-slate-200 ring-1 ring-white/10"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{item.label}</span>
+                            <span className="text-emerald-200">
+                              {item.rank ? `#${item.rank}` : "—"}
+                              {dvpTotalTeams ? `/${dvpTotalTeams}` : ""}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center justify-between text-[9px] text-slate-500">
+                            <span>Def {formatPrimaryAverage(item.value)}/m</span>
+                            <span>Ligue {formatPrimaryAverage(item.leagueAvg)}/m</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-500 ring-1 ring-white/10">
+                        —
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1938,12 +3011,20 @@ export default function PlayerPage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-[#0b070f] p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-50">
-                  {player?.name ?? "Player"}{" "}
-                  <span className="text-sm font-medium text-slate-400">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
+              <div className="min-w-0 flex flex-col">
+                <p className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-50">
+                  {player?.name ?? "Player"}
+                  <span className="inline-flex flex-wrap items-center gap-2 text-sm font-medium text-slate-400">
                     {displayPosition} | {teamName}
+                    <span className="inline-flex items-center gap-1">
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200 ring-1 ring-emerald-500/25">
+                        O {oddsLoading ? "…" : formatOddsPrice(oddsPrices?.over ?? null)}
+                      </span>
+                      <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] text-rose-200 ring-1 ring-rose-500/25">
+                        U {oddsLoading ? "…" : formatOddsPrice(oddsPrices?.under ?? null)}
+                      </span>
+                    </span>
                   </span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
@@ -1955,36 +3036,57 @@ export default function PlayerPage() {
                     ? formatTrendValue(lineForMetric)
                     : "—"}
                 </p>
+                {trendNote && (
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-2 text-[11px]">
+                    <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200 ring-1 ring-white/10">
+                      {windowLabel} vs line{" "}
+                      <span
+                        className={
+                          trendNote.lineDeltaPct !== null && trendNote.lineDeltaPct >= 0
+                            ? "text-emerald-200"
+                            : "text-rose-200"
+                        }
+                      >
+                        {trendNote.lineDeltaPct !== null
+                          ? `${trendNote.lineDeltaPct >= 0 ? "+" : ""}${trendNote.lineDeltaPct}%`
+                          : "—"}
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200 ring-1 ring-white/10">
+                      DvP {dvpMetricLabel ?? "—"}{" "}
+                      <span className="text-amber-200">
+                        {dvpMetricRank && dvpTotalTeams
+                          ? `#${dvpMetricRank}/${dvpTotalTeams}`
+                          : "—"}
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200 ring-1 ring-white/10">
+                      {dvpMetricFlag === "weakness"
+                        ? "Faiblesse def"
+                        : dvpMetricFlag === "strength"
+                          ? "Force def"
+                          : "Profil neutre"}
+                      {dvpMetricLabel ? `: ${dvpMetricLabel}` : ""}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-end gap-3">
                 <div className="rounded-full bg-black/40 px-3 py-1 text-[11px] text-slate-200 ring-1 ring-white/10">
                   2025 <span className="text-slate-500">·</span> {hitPct}%
                 </div>
-                <div className="rounded-full bg-black/40 px-3 py-1 text-[11px] text-slate-200 ring-1 ring-white/10">
-                  H2H <span className="text-slate-500">·</span> {matchupPct}%
-                </div>
-                <div className="inline-flex items-center rounded-full bg-black/40 p-1 text-[11px] ring-1 ring-white/10">
-                  {(["american", "decimal"] as const).map((format) => (
-                    <button
-                      key={format}
-                      type="button"
-                      onClick={() => setOddsFormat(format)}
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] uppercase transition ${
-                        oddsFormat === format
-                          ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/40"
-                          : "text-slate-400 hover:text-slate-200"
-                      }`}
+                <div className="flex flex-col items-center gap-2">
+                  {trendNote && (
+                    <div
+                      className={`flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-[26px] font-semibold ring-1 ${gradeToneStyles[trendNote.grade.tone]}`}
                     >
-                      {format === "american" ? "US" : "DEC"}
-                    </button>
-                  ))}
-                </div>
-                <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200 ring-1 ring-emerald-500/25">
-                  O {oddsLoading ? "…" : formatOddsPrice(oddsPrices?.over ?? null)}
-                </div>
-                <div className="rounded-full bg-rose-500/10 px-3 py-1 text-[11px] text-rose-200 ring-1 ring-rose-500/25">
-                  U {oddsLoading ? "…" : formatOddsPrice(oddsPrices?.under ?? null)}
+                      {trendNote.grade.label}
+                    </div>
+                  )}
+                  <div className="rounded-full bg-black/40 px-3 py-1 text-[11px] text-slate-200 ring-1 ring-white/10">
+                    H2H <span className="text-slate-500">·</span> {matchupPct}%
+                  </div>
                 </div>
               </div>
             </div>
@@ -2084,7 +3186,7 @@ export default function PlayerPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-300">
-              Game logs (Regular Season)
+              Game logs (Season + Playoffs)
               </p>
               {logsUnavailableReason && (
                 <p className="text-xs text-amber-300">{logsUnavailableReason}</p>
@@ -2112,180 +3214,13 @@ export default function PlayerPage() {
             ))}
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-[#0b070f]">
-            <div className="overflow-x-hidden">
-              <table className="w-full table-fixed text-left text-[10px] tabular-nums">
-                <colgroup>
-                  {baseColumns.map((col, idx) => (
-                    <col key={col.key} style={{ width: baseColWidths[idx] ?? "12%" }} />
-                  ))}
-                  {statColumns.map((col) => (
-                    <col key={col.id} style={{ width: statColWidth }} />
-                  ))}
-                </colgroup>
-                <thead className="bg-black/30 uppercase tracking-[0.18em] text-slate-400">
-                  <tr className="text-[9px]">
-                    <th
-                      colSpan={baseColumns.length}
-                      className="px-2 py-2 text-left font-semibold text-slate-300"
-                    >
-                      {seasonLabel}
-                    </th>
-                    {statGroups.map((group, groupIndex) => (
-                      <th
-                        key={group.label}
-                        colSpan={group.columns.length}
-                        className={`px-2 py-2 text-center font-semibold text-slate-300 ${
-                          groupIndex > 0 ? "border-l border-white/10" : ""
-                        }`}
-                      >
-                        {group.label}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr className="text-[9px]">
-                    {baseColumns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="relative cursor-default px-2 py-1 group"
-                        title={col.full}
-                      >
-                        <span>{col.label}</span>
-                        <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden -translate-x-1/2 rounded-md bg-black/90 px-2 py-1 text-[10px] text-amber-100 ring-1 ring-white/10 group-hover:block">
-                          {col.full}
-                        </span>
-                      </th>
-                    ))}
-                    {statColumns.map((col) => (
-                      <th
-                        key={col.id}
-                        className={`relative cursor-default px-1.5 py-1 group ${
-                          col.isGroupStart && col.groupIndex > 0 ? "border-l border-white/10" : ""
-                        }`}
-                        title={col.full}
-                      >
-                        <span>{col.label}</span>
-                        <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden -translate-x-1/2 rounded-md bg-black/90 px-2 py-1 text-[10px] text-amber-100 ring-1 ring-white/10 group-hover:block">
-                          {col.full}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10 text-slate-200">
-                  {sortedLogs
-                    .filter((g) => {
-                      if (logFilter === "All") return true;
-                      return logFilter === "Home" ? g.homeAway === "vs" : g.homeAway === "@";
-                    })
-                    .slice(showAllLogs ? undefined : 0, showAllLogs ? undefined : 5)
-                    .map((g) => {
-                      const isDnp = Boolean(g.dnp);
-                      const valueOrDash = (val: any) =>
-                        val === null || val === undefined || val === "" ? "—" : val;
-                      const cmpPct = isDnp ? "—" : g.att ? ((g.cmp / g.att) * 100).toFixed(1) : "—";
-                      const avg = isDnp ? "—" : Number.isFinite(g.avg) ? g.avg.toFixed(1) : "—";
-                      const rAvg = isDnp ? "—" : Number.isFinite(g.rushAvg) ? g.rushAvg.toFixed(1) : "—";
-                      const recAvg = isDnp
-                        ? "—"
-                        : Number.isFinite(g.recAvg)
-                          ? g.recAvg.toFixed(1)
-                          : g.rec
-                            ? (g.recYds / g.rec).toFixed(1)
-                            : "—";
-                      const rtg = isDnp ? "—" : Number.isFinite(g.rtg) ? g.rtg.toFixed(1) : "—";
-                      const dateValue = typeof g.date === "string" ? g.date : g.date ? String(g.date) : "";
-                      const parsedDate = dateValue && !dateValue.includes(" ")
-                        ? new Date(dateValue).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                        : dateValue;
-                      const oppLabel = g.opp ?? "OPP";
-                      const statValues: Record<string, string | number> = {
-                        cmp: isDnp ? "—" : valueOrDash(g.cmp),
-                        att: isDnp ? "—" : valueOrDash(g.att),
-                        passYds: isDnp ? "—" : valueOrDash(g.yds),
-                        cmpPct,
-                        passAvg: avg,
-                        passTd: isDnp ? "—" : valueOrDash(g.td),
-                        passInt: isDnp ? "—" : valueOrDash(g.ints),
-                        passLng: isDnp ? "—" : valueOrDash(g.lng),
-                        passSack: isDnp ? "—" : valueOrDash(g.sack),
-                        passRtg: rtg,
-                        rushCar: isDnp ? "—" : valueOrDash(g.car),
-                        rushYds: isDnp ? "—" : valueOrDash(g.rushYds),
-                        rushAvg: rAvg,
-                        rushTd: isDnp ? "—" : valueOrDash(g.rushTd),
-                        rushLng: isDnp ? "—" : valueOrDash(g.rushLng),
-                        rec: isDnp ? "—" : valueOrDash(g.rec),
-                        tgts: isDnp ? "—" : valueOrDash(g.tgts),
-                        recYds: isDnp ? "—" : valueOrDash(g.recYds),
-                        recAvg,
-                        recTd: isDnp ? "—" : valueOrDash(g.recTd),
-                        recLng: isDnp ? "—" : valueOrDash(g.recLng),
-                        fum: isDnp ? "—" : valueOrDash(g.fum),
-                        lst: isDnp ? "—" : valueOrDash(g.lst),
-                        ff: isDnp ? "—" : valueOrDash(g.ff),
-                        kb: isDnp ? "—" : valueOrDash(g.kb),
-                      };
-                      const weekLabel = (() => {
-                        if (typeof g.week === "number" && Number.isFinite(g.week)) return `W${g.week}`;
-                        if (typeof g.week === "string") {
-                          const match = g.week.match(/\d+/);
-                          return match ? `W${match[0]}` : g.week;
-                        }
-                        return "—";
-                      })();
-                      const resultClass = isDnp
-                        ? "text-slate-400"
-                        : g.result?.startsWith("W")
-                          ? "text-emerald-300"
-                          : "text-rose-300";
-                      return (
-                        <tr key={`${g.week}-${dateValue}-${g.opp}`} className="hover:bg-white/5">
-                          <td className="px-2 py-1 text-slate-300">
-                            <div className="leading-tight">
-                              <div>{parsedDate || "—"}</div>
-                              <div className="text-[9px] text-slate-500">{weekLabel}</div>
-                            </div>
-                          </td>
-                          <td className="px-2 py-1 text-slate-300 truncate" title={`${g.homeAway} ${oppLabel}`}>
-                            {g.homeAway} {oppLabel}
-                          </td>
-                          <td className={`px-2 py-1 font-semibold ${resultClass}`}>
-                            <span>{g.result ?? "—"}</span>
-                            {isDnp && <span className="ml-2 text-[10px] text-slate-500">DNP</span>}
-                          </td>
-                          {statColumns.map((col) => (
-                            <td
-                              key={`${g.week}-${col.id}`}
-                              className={`px-1.5 py-1 ${
-                                col.isGroupStart && col.groupIndex > 0
-                                  ? "border-l border-white/10"
-                                  : ""
-                              }`}
-                            >
-                              {statValues[col.key] ?? "—"}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  {tableLogs.length > 5 && (
-                    <tr className="bg-black/20">
-                      <td colSpan={baseColumns.length + statColumns.length} className="px-2 py-3 text-center">
-                        <button
-                          onClick={() => setShowAllLogs((prev) => !prev)}
-                          className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-[11px] text-amber-100 transition hover:border-amber-400/40"
-                        >
-                          {showAllLogs ? "Afficher moins" : "Afficher plus"}
-                        </button>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {playoffLogs.length > 0 && (
+            renderLogsTable(playoffLogs, showAllPlayoffLogs, setShowAllPlayoffLogs, playoffsLabel)
+          )}
+          {renderLogsTable(regularLogs, showAllLogs, setShowAllLogs, seasonLabel)}
         </section>
+          </>
+        )}
       </div>
     </div>
   );

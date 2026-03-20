@@ -618,7 +618,7 @@ async function hydrateCachedRowsFromTeamSchedules(
     new Set(
       rows
         .map((r) => toNumberSafe(r.team_id))
-        .filter((id): id is number => Number.isFinite(id) && id > 0),
+        .filter((id): id is number => id !== null && Number.isFinite(id) && id > 0),
     ),
   );
   if (!teamIds.length) return rows;
@@ -1553,7 +1553,7 @@ export async function GET(
       new Set(
         games
           .map((g) => toNumberSafe(g?.team?.id))
-          .filter((id): id is number => Number.isFinite(id) && id > 0),
+          .filter((id): id is number => id !== null && Number.isFinite(id) && id > 0),
       ),
     );
 

@@ -24,13 +24,13 @@ export function sessionExpiryDate(): Date {
   return new Date(Date.now() + AUTH_SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 }
 
-export function authCookieOptions(expiresAt: Date) {
+export function authCookieOptions(expiresAt: Date, persistent = true) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
-    expires: expiresAt,
+    ...(persistent ? { expires: expiresAt } : {}),
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { Lock, Mail, User, X } from "lucide-react";
 
@@ -28,6 +28,7 @@ export default function AccountPage() {
 }
 
 function AccountPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
   const initialTab: "login" | "register" =
@@ -42,6 +43,7 @@ function AccountPageInner() {
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
@@ -59,7 +61,7 @@ function AccountPageInner() {
     }
   }
 
-  async function loadMe() {
+  async function loadMe(redirectIfAuthed = false) {
     setLoading(true);
     setError(null);
     try {
@@ -69,6 +71,10 @@ function AccountPageInner() {
         setUser(null);
         setExpiresAt(null);
       } else {
+        if (redirectIfAuthed) {
+          router.push("/nba");
+          return;
+        }
         setUser(payload.user);
         setExpiresAt(payload.expiresAt ?? null);
       }
@@ -82,7 +88,7 @@ function AccountPageInner() {
   }
 
   useEffect(() => {
-    void loadMe();
+    void loadMe(true);
   }, []);
 
   useEffect(() => {
@@ -108,6 +114,7 @@ function AccountPageInner() {
         body: JSON.stringify({
           email: loginEmail,
           password: loginPassword,
+          rememberMe,
         }),
       });
       const payload = await parseApiPayload(res);
@@ -115,9 +122,7 @@ function AccountPageInner() {
         setError((payload.error as string | undefined) ?? "Connexion impossible.");
         return;
       }
-      setInfo("Connexion reussie.");
-      setLoginPassword("");
-      await loadMe();
+      router.push("/nba");
     } catch {
       setError("Erreur reseau pendant la connexion.");
     } finally {
@@ -145,9 +150,7 @@ function AccountPageInner() {
         setError((payload.error as string | undefined) ?? "Inscription impossible.");
         return;
       }
-      setInfo("Compte cree et connecte.");
-      setRegisterPassword("");
-      await loadMe();
+      router.push("/nba");
     } catch {
       setError("Erreur reseau pendant l'inscription.");
     } finally {
@@ -302,6 +305,15 @@ function AccountPageInner() {
                       className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-amber-400/50"
                       placeholder="Minimum 8 caracteres"
                     />
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2.5 py-1">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/20 accent-amber-500"
+                    />
+                    <span className="text-xs text-slate-400">Rester connecté</span>
                   </label>
                   <button
                     type="submit"

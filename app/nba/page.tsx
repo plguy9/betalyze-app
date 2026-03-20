@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { Activity, BookOpen, Flame, Settings, Sparkles } from "lucide-react";
+import { BookMarked, LayoutDashboard, ShieldAlert, Trophy, Users } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
@@ -1111,28 +1111,6 @@ function NbaPageInner() {
             </div>
           )}
 
-          {/* Mobile — tabs de navigation section */}
-          <div className="mb-4 flex gap-1 rounded-xl p-1 md:hidden" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)" }}>
-            {([
-              { value: "dashboard", label: "Dashboard" },
-              { value: "players",   label: "Players" },
-              { value: "equipes",   label: "Teams" },
-              { value: "defense",   label: "DvP" },
-            ] as const).map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setActiveSection(tab.value)}
-                className="flex-1 rounded-lg py-2 text-[12px] font-semibold transition"
-                style={activeSection === tab.value ? {
-                  background: "rgba(255,138,0,.18)",
-                  color: "#ffb14a",
-                } : { color: "rgba(255,255,255,.35)" }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
 
           <main className="space-y-6">
 
@@ -1246,36 +1224,42 @@ function NbaPageInner() {
 
       {/* ── Mobile bottom nav ── */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-around px-2 py-2 md:hidden"
+        className="fixed bottom-0 inset-x-0 z-40 md:hidden"
         style={{
-          background: "rgba(8,8,14,.96)",
-          borderTop: "1px solid rgba(255,255,255,.09)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          background: "rgba(10,10,15,.97)",
+          borderTop: "1px solid rgba(255,255,255,.08)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        {([
-          { label: "Dashboard",page: "Best Props" as NbaSidebarPage, icon: <Sparkles className="h-5 w-5" /> },
-          { label: "Teams",    page: "Teams"      as NbaSidebarPage, icon: <Activity  className="h-5 w-5" /> },
-          { label: "Parlay",   page: "Parlay"     as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
-          { label: "DvP",      page: "DvP"        as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
-          { label: "Journal",  page: "Bet Journal" as NbaSidebarPage, icon: <BookOpen  className="h-5 w-5" /> },
-          { label: "Réglages", page: "Settings"   as NbaSidebarPage, icon: <Settings  className="h-5 w-5" /> },
-        ] as const).map((item) => {
-          const isActive = sidebarActive === item.page;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => setSidebarActive(item.page)}
-              className="flex flex-col items-center gap-1 rounded-xl px-5 py-1.5 transition"
-              style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.38)" }}
-            >
-              {item.icon}
-              <span className="text-[10px] font-semibold">{item.label}</span>
-            </button>
-          );
-        })}
+        <div className="flex items-stretch">
+          {([
+            { label: "Dashboard", page: "Best Props"  as NbaSidebarPage, icon: LayoutDashboard },
+            { label: "Players",   page: "Players"     as NbaSidebarPage, icon: Users },
+            { label: "Teams",     page: "Teams"       as NbaSidebarPage, icon: Trophy },
+            { label: "DvP",       page: "DvP"         as NbaSidebarPage, icon: ShieldAlert },
+            { label: "Journal",   page: "Bet Journal" as NbaSidebarPage, icon: BookMarked },
+          ] as const).map((item) => {
+            const isActive = sidebarActive === item.page;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => setSidebarActive(item.page)}
+                className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition"
+                style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.32)" }}
+              >
+                {isActive && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full" style={{ background: "#ffb14a" }} />
+                )}
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-semibold tracking-tight">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
       </div>
     </div>

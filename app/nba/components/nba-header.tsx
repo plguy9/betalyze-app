@@ -116,12 +116,41 @@ export function NbaHeader({
 
   return (
     <div
-      className="z-10 flex shrink-0 items-center gap-3 px-4 py-3 sm:px-6"
+      className="z-10 shrink-0"
       style={{
         background: "#0d0d0f",
         boxShadow: "0 1px 0 rgba(255,255,255,.05)",
       }}
     >
+      {/* Sport switcher — mobile uniquement, tout en haut */}
+      <div className="px-3 pt-3 pb-2 md:hidden">
+        <div className="flex gap-1 rounded-xl p-1" style={{ background: "rgba(255,255,255,.05)" }}>
+          {(["NBA", "NFL", "NHL", "MLB"] as const).map((sport) => {
+            const isActive = sport === "NBA";
+            return (
+              <span
+                key={sport}
+                className="flex flex-1 items-center justify-center rounded-lg py-1.5 text-[11px] font-bold"
+                style={isActive ? {
+                  background: "rgba(255,138,0,.18)",
+                  color: "#ffb14a",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.08)",
+                } : {
+                  color: "rgba(255,255,255,.20)",
+                  filter: "blur(2px)",
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              >
+                {sport}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main header row */}
+      <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
       {/* Logo mobile (sidebar cachée) */}
       <Link href="/" className="flex shrink-0 items-center md:hidden">
         <BetalyzeLogo height={22} />
@@ -272,6 +301,7 @@ export function NbaHeader({
           </div>
           <span className="hidden sm:block">Mon compte</span>
         </Link>
+      </div>
       </div>
     </div>
   );

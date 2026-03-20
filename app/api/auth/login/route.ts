@@ -18,6 +18,7 @@ import {
 type LoginBody = {
   email?: string;
   password?: string;
+  rememberMe?: boolean;
 };
 
 export async function POST(req: NextRequest) {
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   const email = normalizeAuthEmail(String(body.email ?? ""));
   const password = String(body.password ?? "");
+  const rememberMe = body.rememberMe !== false;
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email et mot de passe obligatoires" },
@@ -73,6 +75,6 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt,
     },
   });
-  res.cookies.set(AUTH_SESSION_COOKIE, sessionToken, authCookieOptions(expiresAt));
+  res.cookies.set(AUTH_SESSION_COOKIE, sessionToken, authCookieOptions(expiresAt, rememberMe));
   return res;
 }

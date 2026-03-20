@@ -87,27 +87,25 @@ export function NbaSidebar({
           className="mb-3 flex gap-1 rounded-xl p-1"
           style={{ background: "rgba(255,255,255,.05)" }}
         >
-          {(["NBA", "NFL", "NHL", "MLB"] as const).map((sport) => {
+            {(["NBA", "NFL", "NHL", "MLB"] as const).map((sport) => {
             const isActive = sport === "NBA";
-            const href = sport === "NFL" ? "/nfl" : null;
-            const chip = (
+            return (
               <span
-                className="flex flex-1 items-center justify-center rounded-lg py-1.5 text-[11px] font-bold transition"
+                key={sport}
+                className="flex flex-1 items-center justify-center rounded-lg py-1.5 text-[11px] font-bold"
                 style={isActive ? {
                   background: "rgba(255,138,0,.18)",
                   color: "#ffb14a",
                   boxShadow: "inset 0 1px 0 rgba(255,255,255,.08)",
                 } : {
-                  color: "rgba(255,255,255,.30)",
+                  color: "rgba(255,255,255,.20)",
+                  filter: "blur(2px)",
+                  pointerEvents: "none",
+                  userSelect: "none",
                 }}
               >
                 {sport}
               </span>
-            );
-            return href ? (
-              <Link key={sport} href={href} className="flex flex-1">{chip}</Link>
-            ) : (
-              <button key={sport} type="button" className="flex flex-1 cursor-default">{chip}</button>
             );
           })}
         </div>

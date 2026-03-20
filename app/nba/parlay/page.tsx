@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { BetalyzeLogo } from "@/components/betalyze-logo";
 import { useEffect, useMemo, useRef, useState } from "react";

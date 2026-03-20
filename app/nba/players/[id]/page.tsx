@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Shield, SlidersHorizontal, Sparkles } from "lucide-react";

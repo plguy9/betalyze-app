@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { Lock, Mail, User, X } from "lucide-react";
 
 type AuthUser = {
@@ -20,6 +20,14 @@ type MeResponse = {
 };
 
 export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageInner />
+    </Suspense>
+  );
+}
+
+function AccountPageInner() {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
   const initialTab: "login" | "register" =

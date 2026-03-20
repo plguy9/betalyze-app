@@ -21,8 +21,8 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: {
-    default: "BETALYZE",
-    template: "%s | BETALYZE",
+    default: "Betalyze",
+    template: "%s | Betalyze",
   },
   description: "Plateforme d'analyse de paris sportifs spécialisée dans les player props NBA. Identifiez les meilleures opportunités grâce aux statistiques avancées et aux cotes en temps réel.",
   keywords: ["NBA", "player props", "sports betting", "analytics", "best props", "basketball"],

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
   Activity,
@@ -591,6 +591,10 @@ function mapNflTeams(data: any[] | undefined): NflTeam[] {
 }
 
 export default function NflPage() {
+  return <Suspense><NflPageInner /></Suspense>;
+}
+
+function NflPageInner() {
   const [teams, setTeams] = useState<NflTeam[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
   const [teamsError, setTeamsError] = useState<string | null>(null);

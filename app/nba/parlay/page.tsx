@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { BetalyzeLogo } from "@/components/betalyze-logo";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
@@ -238,6 +238,10 @@ function parseQuickAddLeg(raw: string): ParlayLegV1 | null {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function NbaParlayPage() {
+  return <Suspense><NbaParlayPageInner /></Suspense>;
+}
+
+function NbaParlayPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

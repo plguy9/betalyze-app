@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Shield, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
@@ -705,6 +705,10 @@ function OverviewTile({ label, value, tone, subLeft, subRight }: OverviewTilePro
 }
 
 export default function PlayerPage() {
+  return <Suspense><PlayerPageInner /></Suspense>;
+}
+
+function PlayerPageInner() {
   const router = useRouter();
   const params = useParams<{ id?: string | string[] }>();
   const searchParams = useSearchParams();

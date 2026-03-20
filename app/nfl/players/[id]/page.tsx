@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Shield, SlidersHorizontal, Sparkles } from "lucide-react";
 
@@ -890,6 +890,10 @@ function marketForMetric(metric: MetricKey) {
 }
 
 export default function PlayerPage() {
+  return <Suspense><PlayerPageInner /></Suspense>;
+}
+
+function PlayerPageInner() {
   const params = useParams<{ id?: string | string[] }>();
   const searchParams = useSearchParams();
   const [data, setData] = useState<PlayerStatsResponse | null>(null);

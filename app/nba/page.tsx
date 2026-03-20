@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { Activity, BookOpen, Flame, Settings, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
 import { NbaHeader } from "@/app/nba/components/nba-header";
@@ -70,6 +70,10 @@ function decimalToAmericanOdds(value: number): number | null {
 }
 
 export default function NbaPage() {
+  return <Suspense><NbaPageInner /></Suspense>;
+}
+
+function NbaPageInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

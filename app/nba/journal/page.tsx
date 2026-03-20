@@ -1,18 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { BetalyzeLogo } from "@/components/betalyze-logo";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
+import { NbaHeader } from "@/app/nba/components/nba-header";
 import {
+  Activity,
+  BookOpen,
   Calendar,
   ChevronLeft,
   ChevronRight,
   Filter,
+  Flame,
   Pencil,
   Plus,
   RefreshCw,
   Search,
+  Settings,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -59,6 +66,33 @@ type AccountSettingsApiPayload = {
     journalBalance?: number;
   };
   error?: string;
+};
+
+type ParlayTicketLeg = {
+  id: string;
+  player: string;
+  team: string | null;
+  opp: string | null;
+  market: string;
+  side: "over" | "under";
+  line: number;
+  oddsDecimal: number;
+  oddsAmerican: number | null;
+  bookmaker: string | null;
+};
+
+type ParlayTicket = {
+  id: string;
+  legsCount: number;
+  combinedDecimal: number;
+  combinedAmerican: number | null;
+  stake: number | null;
+  payout: number | null;
+  profit: number | null;
+  status: "open" | "won" | "lost" | "void";
+  note: string | null;
+  createdAt: string;
+  legs: ParlayTicketLeg[];
 };
 
 type BankrollPoint = {
@@ -617,68 +651,53 @@ function EntryLogRow({
         </div>
       </div>
 
-      <div className="relative space-y-2 lg:hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", toneDot(entry.tone))} />
-              <p className="truncate text-[13px] font-semibold text-slate-100">
-                {entry.player}
-                <span className="ml-1 text-[11px] font-normal text-white/45">{entry.team ?? "NBA"}</span>
-              </p>
-            </div>
-            <p className="truncate pl-4 text-[11px] text-white/62">
-              {entry.side === "over" ? "Over" : entry.side === "under" ? "Under" : "Tous"} · {entry.prop}
-              {entry.odds !== null ? ` @ ${entry.odds.toFixed(2)}` : ""}
+      <div className="relative space-y-1.5 lg:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", toneDot(entry.tone))} />
+            <p className="truncate text-[12px] font-semibold text-slate-100">
+              {entry.player}
+              <span className="ml-1 text-[10px] font-normal text-white/45">{entry.team ?? "NBA"}</span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-[10px] font-bold",
-                gradePillClass(entry.grade),
-              )}
-            >
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold", gradePillClass(entry.grade))}>
               {entry.grade ?? "—"}
             </span>
+            <span className="text-[10px] text-white/45">{formatDateLabel(entry.eventDate ?? entry.createdAt)}</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-white/72">
+        <p className="truncate pl-3 text-[11px] text-white/55">
+          {entry.side === "over" ? "Over" : entry.side === "under" ? "Under" : "Tous"} · {entry.prop}
+          {entry.odds !== null ? ` @ ${entry.odds.toFixed(2)}` : ""}
+        </p>
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-white/65">
           {entry.edgePct !== null && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-              Edge {entry.edgePct > 0 ? "+" : ""}
-              {entry.edgePct.toFixed(1)}%
+            <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5">
+              Edge {entry.edgePct > 0 ? "+" : ""}{entry.edgePct.toFixed(1)}%
             </span>
           )}
           {entry.score !== null && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">Score {entry.score.toFixed(0)}</span>
-          )}
-          {(entry.stakePct !== null || entry.stakeCash !== null) && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-              Stake {formatStake(entry)}
-            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5">Score {entry.score.toFixed(0)}</span>
           )}
           {entry.bookmaker && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">{entry.bookmaker}</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5">{entry.bookmaker}</span>
           )}
           <ResultSelect
             value={entry.result}
             disabled={Boolean(updatingResult)}
             onChange={(value) => onResultChange(entry.id, value)}
           />
-          <span className="ml-auto text-white/50">{formatDateLabel(entry.eventDate ?? entry.createdAt)}</span>
-        </div>
-        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => onEdit(entry)}
-            className="inline-flex h-8 items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 text-[10px] font-semibold text-white/80 transition hover:bg-white/10"
+            className="ml-auto inline-flex h-7 items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 text-[10px] font-semibold text-white/75 transition hover:bg-white/10"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3 w-3" />
             Modifier
           </button>
         </div>
-        {entry.note && <p className="text-[10px] text-white/40">{entry.note}</p>}
+        {entry.note && <p className="pl-3 text-[10px] text-white/40">{entry.note}</p>}
       </div>
     </div>
   );
@@ -703,8 +722,15 @@ export default function NbaBetJournalPage() {
   const [editForm, setEditForm] = useState<EditEntryForm | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingEdit, setDeletingEdit] = useState(false);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  const [journalTab, setJournalTab] = useState<"bets" | "parlays">("bets");
+  const [parlayTickets, setParlayTickets] = useState<ParlayTicket[]>([]);
+  const [parlayLoading, setParlayLoading] = useState(false);
+  const [parlayError, setParlayError] = useState<string | null>(null);
+  const [updatingParlayId, setUpdatingParlayId] = useState<string | null>(null);
+  const [expandedParlayId, setExpandedParlayId] = useState<string | null>(null);
 
   const selectedEditDate = useMemo(() => {
     if (!editForm?.eventDate) return null;
@@ -766,9 +792,47 @@ export default function NbaBetJournalPage() {
     await Promise.all([loadJournal(), loadJournalBalance()]);
   }, [loadJournal, loadJournalBalance]);
 
+  const loadParlayTickets = useCallback(async () => {
+    setParlayLoading(true);
+    setParlayError(null);
+    try {
+      const res = await fetch("/api/nba/parlay/tickets?limit=100", { cache: "no-store" });
+      if (res.status === 401) {
+        setParlayError("Connecte-toi pour voir tes tickets parlay.");
+        return;
+      }
+      const data = (await res.json()) as { ok?: boolean; tickets?: ParlayTicket[]; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Impossible de charger les parlays.");
+      setParlayTickets(Array.isArray(data.tickets) ? data.tickets : []);
+    } catch (err) {
+      setParlayError(err instanceof Error ? err.message : "Erreur de chargement");
+      setParlayTickets([]);
+    } finally {
+      setParlayLoading(false);
+    }
+  }, []);
+
+  const updateParlayStatus = async (ticketId: string, status: "open" | "won" | "lost" | "void") => {
+    setUpdatingParlayId(ticketId);
+    try {
+      const res = await fetch("/api/nba/parlay/tickets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId, status }),
+      });
+      if (!res.ok) return;
+      setParlayTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, status } : t)),
+      );
+    } catch { /* ignore */ } finally {
+      setUpdatingParlayId(null);
+    }
+  };
+
   useEffect(() => {
     void refreshJournal();
-  }, [refreshJournal]);
+    void loadParlayTickets();
+  }, [refreshJournal, loadParlayTickets]);
 
   useEffect(
     () => () => {
@@ -932,6 +996,7 @@ export default function NbaBetJournalPage() {
     const parsed = parseLegFromProp(entry.prop, entry.side);
     const selectedDate = toInputDate(entry.eventDate ?? entry.createdAt);
     const stakeMode: StakeInputMode = entry.stakeMode === "cash" ? "cash" : "pct";
+    setDeletingConfirm(false);
     setEditingEntry(entry);
     setEditForm({
       eventDate: selectedDate,
@@ -959,6 +1024,7 @@ export default function NbaBetJournalPage() {
   const closeEditModal = () => {
     if (savingEdit || deletingEdit) return;
     setShowDatePicker(false);
+    setDeletingConfirm(false);
     setEditingEntry(null);
     setEditForm(null);
   };
@@ -1037,9 +1103,6 @@ export default function NbaBetJournalPage() {
 
   const deleteEditEntry = async () => {
     if (!editingEntry) return;
-    const confirmed = window.confirm("Supprimer ce log du journal ?");
-    if (!confirmed) return;
-
     setDeletingEdit(true);
     setError(null);
     try {
@@ -1105,6 +1168,8 @@ export default function NbaBetJournalPage() {
   const sidebarActive: NbaSidebarPage = "Bet Journal";
   const setSidebarActive = (page: NbaSidebarPage) => {
     if (page === "Bet Journal") return;
+    if (page === "Billing") { router.push("/nba/billing"); return; }
+    if (page === "Parlay") { router.push("/nba/parlay"); return; }
     if (page === "Settings") {
       router.push("/nba/settings");
       return;
@@ -1117,79 +1182,64 @@ export default function NbaBetJournalPage() {
       router.push("/nba?section=equipes");
       return;
     }
-    if (page === "Best Props" || page === "Players") {
-      router.push("/nba?section=players");
-      return;
-    }
+    if (page === "Best Props") { router.push("/nba"); return; }
+    if (page === "Players") { router.push("/nba?section=players"); return; }
     handleComingSoon(page);
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#07070b] text-white">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 right-[-120px] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.18),transparent_60%)] blur-3xl" />
-      </div>
+    <div className="min-h-screen text-white md:h-screen md:overflow-hidden md:p-3" style={{ background: "#07070b" }}>
 
-      <div className="relative w-full px-6 pt-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5">
-              <span className="text-xs font-semibold text-white/60">LOGO</span>
+      {/* ── App card — arrondie sur desktop ── */}
+      <div
+        className="relative flex min-h-screen flex-col md:min-h-0 md:h-full md:flex-row md:rounded-2xl md:overflow-hidden"
+        style={{ background: "#0d0d0f" }}
+      >
+        {/* Gradients (absolute, clippés par overflow-hidden) */}
+        <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.015]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(700px 500px at 80% -5%, rgba(255,138,0,.14) 0%, transparent 60%), radial-gradient(600px 400px at 15% 50%, rgba(25,199,195,.07) 0%, transparent 60%)" }} />
+
+      {/* ── Sidebar ── */}
+      <NbaSidebar active={sidebarActive} onSelect={setSidebarActive} />
+
+      {/* ── Colonne principale ── */}
+      <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
+
+        <NbaHeader />
+
+        <div className="flex-1 px-4 pb-24 pt-5 sm:px-6 md:overflow-y-auto md:pb-6">
+          {comingSoon && (
+            <div className="mb-3 flex justify-end text-[11px] text-amber-200">
+              <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1">
+                {comingSoon}
+              </span>
             </div>
-            <div className="hidden sm:block">
-              <div className="text-sm font-semibold">Betalyze</div>
-              <div className="text-[11px] text-white/45">Analytics</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <LeagueTab label="NBA" active onClick={() => undefined} />
-            <Link href="/nfl">
-              <LeagueTab label="NFL" />
-            </Link>
-            <LeagueTab label="NHL" onClick={() => handleComingSoon("NHL")} />
-            <LeagueTab label="MLB" onClick={() => handleComingSoon("MLB")} />
-          </div>
-        </div>
-      </div>
-
-      <div className="relative w-full px-6 pb-20 pt-6">
-        {comingSoon && (
-          <div className="mb-3 flex justify-end text-[11px] text-amber-200">
-            <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1">
-              {comingSoon}
-            </span>
-          </div>
-        )}
-
-        <div className="flex gap-6">
-          <NbaSidebar active={sidebarActive} onSelect={setSidebarActive} />
+          )}
 
           <main className="min-w-0 flex-1 space-y-6">
-            <GlassCard className="p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs tracking-widest text-white/35">BET JOURNAL · NBA</p>
-                  <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-100">
-                    Performance & journal
-                  </h1>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/65">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {new Date().toLocaleDateString("fr-CA")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void refreshJournal()}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70 transition hover:bg-white/10"
-                  >
-                    Rafraîchir <RefreshCw className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+            {/* Page header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Bet Journal</h1>
+                <p className="mt-0.5 text-[13px] text-white/40">Historique & performance · NBA</p>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/55">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {new Date().toLocaleDateString("fr-CA")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refreshJournal()}
+                  className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/70 transition hover:bg-white/10"
+                >
+                  Rafraîchir <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
 
-              <div className="mt-4 grid items-start gap-3 lg:grid-cols-[228px_minmax(0,1fr)]">
+            <GlassCard className="p-5">
+              <div className="mt-0 grid items-start gap-3 lg:grid-cols-[228px_minmax(0,1fr)]">
                 <MainWinRateTile winRate={kpis.winRate} wins={kpis.wins} losses={kpis.losses} />
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   <StatTile
@@ -1224,155 +1274,55 @@ export default function NbaBetJournalPage() {
                   <p className="text-xs tracking-widest text-white/35">BANKROLL</p>
                   <p className="mt-1 text-sm text-white/65">Suivi des entrées récentes</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm((prev) => !prev)}
-                    className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-black transition hover:bg-orange-400"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    New entry
-                  </button>
-                  <button className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
-                    <Filter className="h-3.5 w-3.5" />
-                    Filtres
-                  </button>
-                </div>
               </div>
               <div className="mt-4">
                 <BankrollChart series={bankrollSeries} />
               </div>
-
-              {showForm && (
-                <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
-                  <p className="text-xs tracking-widest text-white/40">NOUVELLE ENTRÉE</p>
-                  <div className="mt-3 grid gap-2 md:grid-cols-4">
-                    <input
-                      value={form.player}
-                      onChange={(e) => setForm((prev) => ({ ...prev, player: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Player"
-                    />
-                    <input
-                      value={form.team}
-                      onChange={(e) => setForm((prev) => ({ ...prev, team: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Team"
-                    />
-                    <input
-                      value={form.opp}
-                      onChange={(e) => setForm((prev) => ({ ...prev, opp: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Opp"
-                    />
-                    <input
-                      value={form.prop}
-                      onChange={(e) => setForm((prev) => ({ ...prev, prop: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Prop"
-                    />
-                    <input
-                      value={form.odds}
-                      onChange={(e) => setForm((prev) => ({ ...prev, odds: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Odds (1.90)"
-                    />
-                    <input
-                      value={form.edgePct}
-                      onChange={(e) => setForm((prev) => ({ ...prev, edgePct: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Edge %"
-                    />
-                    <input
-                      value={form.score}
-                      onChange={(e) => setForm((prev) => ({ ...prev, score: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Score"
-                    />
-                    <input
-                      value={form.stakePct}
-                      onChange={(e) => setForm((prev) => ({ ...prev, stakePct: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Stake %"
-                    />
-                    <input
-                      value={form.clv}
-                      onChange={(e) => setForm((prev) => ({ ...prev, clv: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="CLV"
-                    />
-                    <input
-                      value={form.grade}
-                      onChange={(e) => setForm((prev) => ({ ...prev, grade: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Grade"
-                    />
-                    <select
-                      value={form.result}
-                      onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value as JournalResult }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                    >
-                      <option value="W">W</option>
-                      <option value="L">L</option>
-                      <option value="V">V</option>
-                    </select>
-                    <select
-                      value={form.side}
-                      onChange={(e) => setForm((prev) => ({ ...prev, side: e.target.value as JournalSide }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                    >
-                      <option value="all">All</option>
-                      <option value="over">Over</option>
-                      <option value="under">Under</option>
-                    </select>
-                    <input
-                      value={form.bookmaker}
-                      onChange={(e) => setForm((prev) => ({ ...prev, bookmaker: e.target.value }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                      placeholder="Bookmaker"
-                    />
-                    <select
-                      value={form.tone}
-                      onChange={(e) => setForm((prev) => ({ ...prev, tone: e.target.value as JournalTone }))}
-                      className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                    >
-                      <option value="orange">orange</option>
-                      <option value="red">red</option>
-                      <option value="blue">blue</option>
-                      <option value="green">green</option>
-                      <option value="purple">purple</option>
-                      <option value="neutral">neutral</option>
-                    </select>
-                  </div>
-                  <textarea
-                    value={form.note}
-                    onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
-                    className="mt-2 min-h-20 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-orange-400/40"
-                    placeholder="Note"
-                  />
-                  <div className="mt-3 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowForm(false)}
-                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/70"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void submitEntry()}
-                      disabled={saving}
-                      className="rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-black transition hover:bg-orange-400 disabled:opacity-60"
-                    >
-                      {saving ? "Saving..." : "Ajouter"}
-                    </button>
-                  </div>
-                </div>
-              )}
             </GlassCard>
 
             <GlassCard className="p-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setJournalTab("bets")}
+                    className={cn(
+                      "rounded-full px-4 py-1.5 text-[11px] font-semibold transition",
+                      journalTab === "bets"
+                        ? "bg-orange-500/15 text-orange-200"
+                        : "text-white/50 hover:text-white/80",
+                    )}
+                  >
+                    Mes paris
+                    <span className="ml-1.5 text-[10px] opacity-60">{filtered.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setJournalTab("parlays")}
+                    className={cn(
+                      "rounded-full px-4 py-1.5 text-[11px] font-semibold transition",
+                      journalTab === "parlays"
+                        ? "bg-orange-500/15 text-orange-200"
+                        : "text-white/50 hover:text-white/80",
+                    )}
+                  >
+                    Parlays
+                    <span className="ml-1.5 text-[10px] opacity-60">{parlayTickets.length}</span>
+                  </button>
+                </div>
+                {journalTab === "bets" && (
+                  <button
+                    type="button"
+                    onClick={() => { setForm(DEFAULT_FORM); setShowForm(true); }}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-black transition hover:opacity-90"
+                    style={{ background: "linear-gradient(135deg, #ff8a00 0%, #ffb14a 100%)" }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Nouvelle entrée
+                  </button>
+                )}
+              </div>
+              {journalTab === "bets" && <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative w-full lg:max-w-xl">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
                   <input
@@ -1417,50 +1367,265 @@ export default function NbaBetJournalPage() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </div>}
 
-              {loading ? (
-                <p className="mt-4 text-sm text-slate-400">Chargement du journal...</p>
-              ) : error ? (
-                <p className="mt-4 text-sm text-rose-300">{error}</p>
-              ) : filtered.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-400">Aucune entrée pour ces filtres.</p>
+              {journalTab === "bets" ? (
+                <>
+                  {loading ? (
+                    <div className="mt-4 flex items-center gap-3 text-sm text-slate-400">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Chargement du journal...
+                    </div>
+                  ) : error ? (
+                    <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                      {error}
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 py-14 text-center text-sm text-slate-500">
+                      <div className="mb-2 text-2xl">📋</div>
+                      Aucune entrée pour ces filtres
+                    </div>
+                  ) : (
+                    <div className="mt-5 space-y-2 rounded-2xl border border-white/10 bg-black/20 p-2">
+                      <div className="hidden grid-cols-[minmax(0,1.75fr)_82px_68px_68px_72px_66px_72px_96px_102px_102px] items-center gap-1 border-b border-white/10 px-2 pb-2 text-[10px] uppercase tracking-widest text-white/40 [&>*]:px-1.5 [&>*:not(:first-child)]:border-l [&>*:not(:first-child)]:border-white/5 lg:grid">
+                        <span>Joueur / marché</span>
+                        <span className="text-center">Date</span>
+                        <span className="text-center">Side</span>
+                        <span className="text-center">Cote</span>
+                        <span className="text-center">Edge</span>
+                        <span className="text-center">Score</span>
+                        <span className="text-center">Stake</span>
+                        <span className="text-center">Book</span>
+                        <span className="text-center">W/L</span>
+                        <span className="text-center">Action</span>
+                      </div>
+                      {filtered.map((entry) => (
+                        <EntryLogRow
+                          key={entry.id}
+                          entry={entry}
+                          updatingResult={updatingResultId === entry.id}
+                          onResultChange={updateEntryResult}
+                          onEdit={openEditModal}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="mt-5 space-y-2 rounded-2xl border border-white/10 bg-black/20 p-2">
-                  <div className="hidden grid-cols-[minmax(0,1.75fr)_82px_68px_68px_72px_66px_72px_96px_102px_102px] items-center gap-1 border-b border-white/10 px-2 pb-2 text-[10px] uppercase tracking-widest text-white/40 [&>*]:px-1.5 [&>*:not(:first-child)]:border-l [&>*:not(:first-child)]:border-white/5 lg:grid">
-                    <span>Joueur / marché</span>
-                    <span className="text-center">Date</span>
-                    <span className="text-center">Side</span>
-                    <span className="text-center">Cote</span>
-                    <span className="text-center">Edge</span>
-                    <span className="text-center">Score</span>
-                    <span className="text-center">Stake</span>
-                    <span className="text-center">Book</span>
-                    <span className="text-center">W/L</span>
-                    <span className="text-center">Action</span>
-                  </div>
-                  {filtered.map((entry) => (
-                    <EntryLogRow
-                      key={entry.id}
-                      entry={entry}
-                      updatingResult={updatingResultId === entry.id}
-                      onResultChange={updateEntryResult}
-                      onEdit={openEditModal}
-                    />
-                  ))}
+                /* ── Parlays tab ─────────────────────────────────────────── */
+                <div className="mt-4">
+                  {parlayLoading ? (
+                    <div className="flex items-center gap-3 text-sm text-slate-400">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Chargement des tickets…
+                    </div>
+                  ) : parlayError ? (
+                    <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                      {parlayError}
+                    </div>
+                  ) : parlayTickets.length === 0 ? (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 py-12 text-center">
+                      <div className="mb-2 text-2xl">🎰</div>
+                      <p className="text-sm text-slate-500">Aucun ticket parlay sauvegardé</p>
+                      <a
+                        href="/nba/parlay"
+                        className="mt-3 inline-block rounded-full border border-amber-500/35 bg-amber-500/10 px-4 py-1.5 text-[12px] font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                      >
+                        Créer un parlay →
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {parlayTickets.map((ticket) => {
+                        const STATUS_CFG: Record<string, { border: string; bg: string; dot: string; label: string }> = {
+                          won:  { border: "rgba(52,211,153,.28)",  bg: "rgba(52,211,153,.07)",  dot: "#34d399", label: "Gagné" },
+                          lost: { border: "rgba(248,113,113,.26)", bg: "rgba(248,113,113,.06)", dot: "#f87171", label: "Perdu" },
+                          void: { border: "rgba(148,163,184,.18)", bg: "rgba(148,163,184,.05)", dot: "#94a3b8", label: "Annulé" },
+                          open: { border: "rgba(251,191,36,.22)",  bg: "rgba(251,191,36,.05)",  dot: "#fbbf24", label: "En cours" },
+                        };
+                        const s = STATUS_CFG[ticket.status] ?? STATUS_CFG.open!;
+                        const isExpanded = expandedParlayId === ticket.id;
+                        const isUpdating = updatingParlayId === ticket.id;
+                        const amOdds = Number.isFinite(ticket.combinedAmerican ?? NaN)
+                          ? (ticket.combinedAmerican! > 0 ? `+${ticket.combinedAmerican}` : `${ticket.combinedAmerican}`)
+                          : `${ticket.combinedDecimal.toFixed(2)}×`;
+                        const createdDate = new Date(ticket.createdAt).toLocaleDateString("fr-CA", { month: "short", day: "numeric" });
+                        const legPreviews = ticket.legs.slice(0, 4).map((l) => {
+                          const lastName = l.player.split(" ").slice(1).join(" ") || l.player;
+                          const sideLabel = l.side === "over" ? "O" : "U";
+                          return `${lastName} ${l.market} ${sideLabel}${l.line}`;
+                        });
+                        const moreLegs = ticket.legs.length > 4 ? ` +${ticket.legs.length - 4}` : "";
+                        const payoutDisplay = ticket.status === "won"
+                          ? { label: `+$${(ticket.profit ?? ticket.payout ?? 0).toFixed(2)}`, color: "#34d399" }
+                          : ticket.status === "lost"
+                            ? { label: `-$${(ticket.stake ?? 0).toFixed(2)}`, color: "#f87171" }
+                            : ticket.payout !== null
+                              ? { label: `→ $${ticket.payout.toFixed(2)}`, color: "rgba(255,255,255,.40)" }
+                              : null;
+
+                        return (
+                          <div
+                            key={ticket.id}
+                            className="overflow-hidden rounded-xl border transition-all"
+                            style={{ borderColor: s.border, background: `linear-gradient(135deg, ${s.bg} 0%, rgba(5,5,8,.97) 65%)` }}
+                          >
+                            {/* Compact 2-row header */}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedParlayId(isExpanded ? null : ticket.id)}
+                              className="flex w-full flex-col gap-1.5 px-3.5 py-2.5 text-left"
+                            >
+                              {/* Row 1: status badge · legs+odds · date · arrow */}
+                              <div className="flex w-full items-center gap-2.5">
+                                {/* Status badge pill */}
+                                <span
+                                  className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                                  style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.dot }}
+                                >
+                                  {s.label}
+                                </span>
+
+                                {/* Legs count + odds */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[12px] font-bold text-white/70">
+                                    {ticket.legsCount}L
+                                  </span>
+                                  <span className="text-[13px] font-black tabular-nums" style={{ color: s.dot }}>
+                                    {amOdds}
+                                  </span>
+                                </div>
+
+                                <div className="flex-1" />
+
+                                {/* Stake & payout */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {ticket.stake !== null && (
+                                    <span className="text-[11px] text-white/40">${ticket.stake.toFixed(0)}</span>
+                                  )}
+                                  {payoutDisplay && (
+                                    <span className="text-[12px] font-bold tabular-nums" style={{ color: payoutDisplay.color }}>
+                                      {payoutDisplay.label}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <span className="text-[10px] text-white/25 shrink-0">{createdDate}</span>
+                                <span className="text-[10px] text-white/25 shrink-0">{isExpanded ? "▲" : "▼"}</span>
+                              </div>
+
+                              {/* Row 2: leg previews */}
+                              <div className="flex items-center gap-0 min-w-0">
+                                {legPreviews.map((preview, idx) => (
+                                  <span key={idx} className="shrink-0 text-[10px] text-white/38">
+                                    {idx > 0 && <span className="mx-1.5 text-white/18">·</span>}
+                                    {preview}
+                                  </span>
+                                ))}
+                                {moreLegs && (
+                                  <span className="ml-1.5 text-[10px] text-white/25">{moreLegs}</span>
+                                )}
+                              </div>
+                            </button>
+
+                            {/* Expanded: legs + status buttons */}
+                            {isExpanded && (
+                              <div style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+                                {/* Legs list */}
+                                <div className="grid gap-px" style={{ background: "rgba(0,0,0,.15)" }}>
+                                  {ticket.legs.map((leg) => (
+                                    <div key={leg.id} className="flex items-center justify-between gap-2 px-4 py-1.5" style={{ background: "rgba(0,0,0,.10)" }}>
+                                      <div className="min-w-0">
+                                        <span className="text-[12px] font-semibold text-white/80">{leg.player}</span>
+                                        <span className="ml-2 text-[11px] text-white/40">
+                                          {leg.market} {leg.side === "over" ? "O" : "U"} {leg.line}
+                                        </span>
+                                        {(leg.team ?? leg.opp) && (
+                                          <span className="ml-1.5 text-[10px] text-white/22">
+                                            {leg.team}{leg.opp ? ` vs ${leg.opp}` : ""}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {leg.oddsAmerican !== null && (
+                                        <span className="shrink-0 text-[11px] font-bold tabular-nums text-white/45">
+                                          {leg.oddsAmerican > 0 ? `+${leg.oddsAmerican}` : leg.oddsAmerican}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Status buttons + summary */}
+                                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="mr-1 text-[10px] text-white/30">Résultat :</span>
+                                    {(["open", "won", "lost", "void"] as const).map((st) => {
+                                      const cfg = STATUS_CFG[st]!;
+                                      const isActive = ticket.status === st;
+                                      return (
+                                        <button
+                                          key={st}
+                                          type="button"
+                                          disabled={isUpdating || isActive}
+                                          onClick={() => void updateParlayStatus(ticket.id, st)}
+                                          className="rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition"
+                                          style={{
+                                            borderColor: isActive ? cfg.border : "rgba(255,255,255,.10)",
+                                            background: isActive ? cfg.bg : "transparent",
+                                            color: isActive ? cfg.dot : "rgba(255,255,255,.35)",
+                                            cursor: isActive ? "default" : "pointer",
+                                          }}
+                                        >
+                                          {cfg.label}
+                                        </button>
+                                      );
+                                    })}
+                                    {isUpdating && (
+                                      <span className="text-[10px] text-white/30">Mise à jour…</span>
+                                    )}
+                                  </div>
+
+                                  {/* Payout summary */}
+                                  {ticket.stake !== null && ticket.payout !== null && (
+                                    <div className="flex items-center gap-3 text-right">
+                                      <span className="text-[10px] text-white/30">
+                                        ${ticket.stake.toFixed(2)} → <span className="font-bold text-white/55">${ticket.payout.toFixed(2)}</span>
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </GlassCard>
 
             {editingEntry && editForm && (
-              <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
-                <div className="w-full max-w-2xl rounded-3xl border border-white/15 bg-[#0b0b12] p-4 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold tracking-wide text-white/90">Modifier leg</p>
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+                <div className="w-full max-w-2xl rounded-t-3xl border border-white/15 bg-[#0b0b12] p-4 shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:rounded-3xl sm:p-5">
+                  {/* Modal header with player context */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold tracking-widest text-white/35">MODIFIER ENTRÉE</p>
+                      <p className="mt-0.5 text-base font-semibold text-white">{editingEntry.player}</p>
+                      <p className="mt-0.5 text-[11px] text-white/45">
+                        {editingEntry.team ?? "NBA"}
+                        {editingEntry.opp ? ` · vs ${editingEntry.opp}` : ""}
+                        {" · "}
+                        <span className={cn("font-semibold", gradePillClass(editingEntry.grade).split(" ").find(c => c.startsWith("text-")))}>
+                          {editingEntry.grade ?? "—"}
+                        </span>
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={closeEditModal}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -1700,30 +1865,252 @@ export default function NbaBetJournalPage() {
                     </div>
                   </div>
 
+                  {/* Delete confirmation strip */}
+                  {deletingConfirm ? (
+                    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-rose-500/35 bg-rose-500/10 px-4 py-3">
+                      <p className="flex-1 text-xs text-rose-200">Supprimer définitivement cette entrée ?</p>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingConfirm(false)}
+                        disabled={deletingEdit}
+                        className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteEditEntry()}
+                        disabled={deletingEdit}
+                        className="rounded-full border border-rose-500/45 bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-100 transition hover:bg-rose-500/30 disabled:opacity-60"
+                      >
+                        {deletingEdit ? "Suppression..." : "Oui, supprimer"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeletingConfirm(true)}
+                        disabled={savingEdit || deletingEdit}
+                        className="rounded-full border border-rose-500/35 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-60"
+                      >
+                        Supprimer
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={closeEditModal}
+                          disabled={savingEdit || deletingEdit}
+                          className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/75 transition hover:bg-white/10"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void submitEdit()}
+                          disabled={savingEdit || deletingEdit}
+                          className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold text-black transition disabled:opacity-60"
+                          style={{ background: "linear-gradient(135deg, #ff8a00 0%, #ffb14a 100%)" }}
+                        >
+                          {savingEdit ? "Sauvegarde..." : "Sauvegarder"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── New entry modal ── */}
+            {showForm && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+                <div className="w-full max-w-2xl rounded-t-3xl border border-white/15 bg-[#0b0b12] p-4 shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:rounded-3xl sm:p-5">
+                  {/* Modal header */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold tracking-widest text-white/35">NOUVELLE ENTRÉE</p>
+                      <p className="mt-0.5 text-base font-semibold text-white">Ajouter un pari</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      disabled={saving}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    {/* JOUEUR */}
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold tracking-widest text-white/35">JOUEUR</p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Joueur *</span>
+                          <input
+                            value={form.player}
+                            onChange={(e) => setForm((prev) => ({ ...prev, player: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="LeBron James"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Équipe</span>
+                          <input
+                            value={form.team}
+                            onChange={(e) => setForm((prev) => ({ ...prev, team: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="LAL"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Adversaire</span>
+                          <input
+                            value={form.opp}
+                            onChange={(e) => setForm((prev) => ({ ...prev, opp: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="GSW"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* PARI */}
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold tracking-widest text-white/35">PARI</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 sm:col-span-2">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Prop *</span>
+                          <input
+                            value={form.prop}
+                            onChange={(e) => setForm((prev) => ({ ...prev, prop: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="PTS O 27.5"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Side</span>
+                          <select
+                            value={form.side}
+                            onChange={(e) => setForm((prev) => ({ ...prev, side: e.target.value as JournalSide }))}
+                            className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white/90 outline-none focus:border-orange-400/45"
+                          >
+                            <option value="over">Over</option>
+                            <option value="under">Under</option>
+                            <option value="all">All</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Bookmaker</span>
+                          <select
+                            value={form.bookmaker}
+                            onChange={(e) => setForm((prev) => ({ ...prev, bookmaker: e.target.value }))}
+                            className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white/90 outline-none focus:border-orange-400/45"
+                          >
+                            {BOOKMAKER_OPTIONS.map((b) => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Cote</span>
+                          <input
+                            value={form.odds}
+                            onChange={(e) => setForm((prev) => ({ ...prev, odds: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="1.90"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Stake %</span>
+                          <input
+                            list="new-stake-pct-opts"
+                            value={form.stakePct}
+                            onChange={(e) => setForm((prev) => ({ ...prev, stakePct: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="0.5"
+                          />
+                          <datalist id="new-stake-pct-opts">
+                            {STAKE_PCT_OPTIONS.map((v) => <option key={v} value={v} />)}
+                          </datalist>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* ANALYSE */}
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold tracking-widest text-white/35">ANALYSE</p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Grade</span>
+                          <input
+                            value={form.grade}
+                            onChange={(e) => setForm((prev) => ({ ...prev, grade: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="A+"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Edge %</span>
+                          <input
+                            value={form.edgePct}
+                            onChange={(e) => setForm((prev) => ({ ...prev, edgePct: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="+5.2"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[11px] uppercase tracking-widest text-white/45">Score</span>
+                          <input
+                            value={form.score}
+                            onChange={(e) => setForm((prev) => ({ ...prev, score: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                            placeholder="82"
+                          />
+                        </label>
+                      </div>
+                      <label className="mt-3 block space-y-1">
+                        <span className="text-[11px] uppercase tracking-widest text-white/45">Note</span>
+                        <textarea
+                          value={form.note}
+                          onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
+                          rows={2}
+                          className="w-full resize-none rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
+                          placeholder="Contexte, analyse..."
+                        />
+                      </label>
+                    </div>
+
+                    {/* RÉSULTAT */}
+                    <div>
+                      <p className="mb-2 text-[10px] font-semibold tracking-widest text-white/35">RÉSULTAT</p>
+                      <ResultSelect
+                        value={form.result}
+                        onChange={(value) => setForm((prev) => ({ ...prev, result: value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
                   <div className="mt-4 flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => void deleteEditEntry()}
-                      disabled={savingEdit || deletingEdit}
-                      className="rounded-full border border-rose-500/35 bg-rose-500/12 px-4 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-60"
-                    >
-                      {deletingEdit ? "Suppression..." : "Supprimer"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={closeEditModal}
-                      disabled={savingEdit || deletingEdit}
-                      className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/75 transition hover:bg-white/10"
+                      onClick={() => setShowForm(false)}
+                      disabled={saving}
+                      className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/75 transition hover:bg-white/10 disabled:opacity-60"
                     >
                       Annuler
                     </button>
                     <button
                       type="button"
-                      onClick={() => void submitEdit()}
-                      disabled={savingEdit || deletingEdit}
-                      className="rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-black transition hover:bg-orange-400 disabled:opacity-60"
+                      onClick={() => void submitEntry()}
+                      disabled={saving || !form.player.trim() || !form.prop.trim()}
+                      className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold text-black transition hover:opacity-90 disabled:opacity-60"
+                      style={{ background: "linear-gradient(135deg, #ff8a00 0%, #ffb14a 100%)" }}
                     >
-                      {savingEdit ? "Sauvegarde..." : "Sauvegarder"}
+                      <Plus className="h-3.5 w-3.5" />
+                      {saving ? "Ajout..." : "Ajouter"}
                     </button>
                   </div>
                 </div>
@@ -1731,6 +2118,41 @@ export default function NbaBetJournalPage() {
             )}
           </main>
         </div>
+      </div>
+
+      {/* ── Mobile bottom nav ── */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-around px-2 py-2 md:hidden"
+        style={{
+          background: "rgba(8,8,14,.96)",
+          borderTop: "1px solid rgba(255,255,255,.09)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+        }}
+      >
+        {([
+          { label: "Props",    page: "Best Props"  as NbaSidebarPage, icon: <Sparkles className="h-5 w-5" /> },
+          { label: "Teams",    page: "Teams"        as NbaSidebarPage, icon: <Activity  className="h-5 w-5" /> },
+          { label: "Parlay",   page: "Parlay"       as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
+          { label: "DvP",      page: "DvP"          as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
+          { label: "Journal",  page: "Bet Journal"  as NbaSidebarPage, icon: <BookOpen  className="h-5 w-5" /> },
+          { label: "Réglages", page: "Settings"     as NbaSidebarPage, icon: <Settings  className="h-5 w-5" /> },
+        ] as const).map((item) => {
+          const isActive = sidebarActive === item.page;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setSidebarActive(item.page)}
+              className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 transition"
+              style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.38)" }}
+            >
+              {item.icon}
+              <span className="text-[10px] font-semibold">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
       </div>
     </div>
   );

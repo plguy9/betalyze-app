@@ -381,4 +381,69 @@ Output :
 
 ---
 
+# 13. 🧹 Historique Technique NBA (2026-03-17)
+
+### ✅ Décision: Source joueurs NBA unique = API-Sports NBA v2
+
+- La table `nba_players` est désormais alignée sur `sync-players-v2` uniquement.
+- Les profils legacy/dupliqués ont été purgés.
+- Objectif: un seul `player_id` canonique par joueur pour éviter les logs fragmentés.
+
+### ✅ Actions exécutées
+
+- `GET /api/nba/sync-players-v2` exécuté.
+- Résultat cleanup:
+1. `dbUpserted: 625`
+2. `prune.deleted: 613`
+- Purge complémentaire DB:
+1. suppression des lignes `nba_players` non `sync-players-v2` sur saisons cibles.
+2. état final: `625` joueurs, saison `2025-2026`, source `sync-players-v2`.
+3. doublons de noms: `0`.
+
+### ✅ Hardening code
+
+- `app/api/nba/sync-players-v2/route.ts`:
+1. filtrage `teams` sur `nbaFranchise === true` pour éviter les équipes non NBA.
+- `app/api/nba/logs/refresh-yesterday/route.ts`:
+1. ne modifie plus `nba_players.source` (on préserve la source canonique `sync-players-v2`).
+
+### 🔜 Suite prévue (uniformisation logs)
+
+- Ajouter un mapping `old_player_id -> canonical_player_id`.
+- Lire/écrire les logs via l’ID canonique.
+- Migrer les anciens logs en DB par batch (sans backfill API complet).
+
+---
+
+# 14. 🧭 Décision Saison API (2026-03-18)
+
+### ✅ Règle canonique
+
+- Le format saison canonique DB est maintenant **API-first**: `YYYY` (ex: `2025`).
+- La saison NBA `2025-2026` est stockée et requêtée en `2025`.
+- Le format `YYYY-YYYY` est conservé uniquement comme alias de compatibilité lecture.
+
+### ✅ Correctifs appliqués
+
+1. `lib/nba/players-db.ts`
+- `normalizeNbaSeasonLabel()` normalise désormais vers `YYYY`.
+- `nbaSeasonAliases()` continue de supporter `YYYY` + `YYYY-YYYY`.
+
+2. `app/api/nba/logs/refresh-yesterday/route.ts`
+- En mode `played`, écriture des logs avec la saison normalisée (`YYYY`).
+
+3. Migration DB exécutée
+- `nba_players`: `2025-2026` -> `2025`.
+- `nba_player_game_logs`: `2025-2026` -> `2025`.
+- Merge de sécurité en cas de doublons `(player_id, season[, game_id])`.
+4. Fix DvP NBA
+- `app/api/nba/defense/dvp/route.ts`: correction du parsing `APISPORTS_NBA_LEAGUE_ID` (`standard` => `12`) pour éviter `league_id = NaN` et un DvP vide.
+
+### ✅ Validation rapide
+
+- Sync `played` du `2026-03-17`: `177/177` succès, `0` échec.
+- Fiche joueur compatible en `season=2025` et `season=2025-2026` (alias).
+
+---
+
 # 🔚 Fin de BETALYZE_BIBLE.md — Version 1.0

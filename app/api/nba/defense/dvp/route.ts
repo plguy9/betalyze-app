@@ -67,23 +67,25 @@ type DvpLogRow = {
 };
 
 const DEFAULT_SEASON = normalizeNbaSeasonLabel(
-  process.env.APISPORTS_BASKETBALL_SEASON ??
-    process.env.APISPORTS_NBA_SEASON ??
-    "2025-2026",
+  process.env.APISPORTS_NBA_SEASON ?? "2025",
 );
-const DEFAULT_LEAGUE_ID = Number(
-  process.env.APISPORTS_BASKETBALL_LEAGUE_ID ??
-    process.env.APISPORTS_NBA_LEAGUE_ID ??
-    "12",
-);
+const DEFAULT_LEAGUE_ID = (() => {
+  const raw = String(process.env.APISPORTS_NBA_LEAGUE_ID ?? "12")
+    .trim()
+    .toLowerCase();
+  if (!raw || raw === "standard" || raw === "nba") return 12;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 12;
+})();
 
-const FINISHED_STATUSES = ["FT", "AOT", "AET"];
+const FINISHED_STATUSES = ["FT", "AOT", "AET", "3"];
 const POSITIONS: PositionKey[] = ["G", "F", "C"];
 const WINDOWS: WindowKey[] = ["season", "L10", "L5"];
 const CONTEXTS: ContextKey[] = ["all", "home", "away"];
-const NBA_TEAM_ID_SET = new Set<number>([
-  132, 133, 134, 135, 136, 137, 140, 143, 147, 148, 151, 153, 154, 159, 161,
-  138, 139, 141, 142, 144, 145, 146, 149, 150, 152, 155, 156, 157, 158, 160,
+const NBA_TEAM_CODES = new Set<string>([
+  "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+  "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+  "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS",
 ]);
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -288,14 +290,17 @@ function buildDefenseGames(rows: DvpLogRow[]) {
   for (const row of rows) {
     const defenseTeamId = Number(row.defense_team_id);
     if (!Number.isFinite(defenseTeamId) || defenseTeamId <= 0) continue;
-    if (!NBA_TEAM_ID_SET.has(defenseTeamId)) continue;
+    const defenseTeamCode = String(row.defense_team_code ?? "")
+      .trim()
+      .toUpperCase();
+    if (defenseTeamCode && !NBA_TEAM_CODES.has(defenseTeamCode)) continue;
 
     const position = normalizePosition(row.player_position);
     if (!position) continue;
 
     teamMeta.set(defenseTeamId, {
       name: row.defense_team_name ?? null,
-      abbr: row.defense_team_code ?? null,
+      abbr: defenseTeamCode || null,
     });
 
     const gameId = Number(row.game_id);

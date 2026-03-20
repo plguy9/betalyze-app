@@ -191,3 +191,43 @@ export async function writeNbaOddsDailyCache(params: {
     return false;
   }
 }
+
+export async function purgeNbaOddsDailyCacheExcept(
+  dateKeyOrKeys: string | string[],
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  await ensureCacheTable();
+  const keepKeys = Array.isArray(dateKeyOrKeys)
+    ? dateKeyOrKeys.filter(Boolean)
+    : [dateKeyOrKeys].filter(Boolean);
+
+  if (supabase) {
+    const query = supabase.from(TABLE_NAME).delete();
+    if (keepKeys.length <= 1) {
+      await query.neq("date_key", keepKeys[0] ?? "__none__");
+      return;
+    }
+    const inFilter = `(${keepKeys.map((key) => `"${key}"`).join(",")})`;
+    await query.not("date_key", "in", inFilter);
+    return;
+  }
+
+  try {
+    if (!keepKeys.length) {
+      await prisma.$executeRawUnsafe(`
+        delete from ${TABLE_NAME}
+      `);
+      return;
+    }
+    const placeholders = keepKeys.map((_, idx) => `$${idx + 1}`).join(", ");
+    await prisma.$executeRawUnsafe(
+      `
+        delete from ${TABLE_NAME}
+        where date_key not in (${placeholders})
+      `,
+      ...keepKeys,
+    );
+  } catch {
+    // ignore cleanup failures; cache write remains valid
+  }
+}

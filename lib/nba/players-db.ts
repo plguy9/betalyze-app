@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type NbaPlayerRecord = {
@@ -43,6 +44,12 @@ type UpsertNbaPlayersParams = {
   players: NbaPlayerRecord[];
 };
 
+type PruneNbaPlayersParams = {
+  season: string;
+  keepPlayerIds: number[];
+  minKeepCount?: number;
+};
+
 let playersTableInit: Promise<void> | null = null;
 
 export function nbaSeasonAliases(season: string): string[] {
@@ -50,13 +57,15 @@ export function nbaSeasonAliases(season: string): string[] {
   const yearMatch = input.match(/(\d{4})/);
   const year = yearMatch ? Number(yearMatch[1]) : null;
   const span = Number.isFinite(year) ? `${year}-${(year as number) + 1}` : null;
-  return Array.from(new Set([input, span, yearMatch?.[1] ?? null].filter(Boolean) as string[]));
+  return Array.from(
+    new Set([yearMatch?.[1] ?? null, span, input].filter(Boolean) as string[]),
+  );
 }
 
 export function normalizeNbaSeasonLabel(season: string): string {
   const aliases = nbaSeasonAliases(season);
-  const span = aliases.find((s) => /^\d{4}-\d{4}$/.test(s));
-  return span ?? aliases[0] ?? season;
+  const year = aliases.find((s) => /^\d{4}$/.test(s));
+  return year ?? aliases[0] ?? season;
 }
 
 function cleanText(value: unknown): string | null {
@@ -289,7 +298,67 @@ export async function upsertNbaPlayersForSeason({
 
 export async function readNbaPlayersFromDb(season: string): Promise<NbaPlayerRecord[]> {
   await ensureNbaPlayersTable();
-  for (const alias of nbaSeasonAliases(season)) {
+  const aliases = nbaSeasonAliases(season);
+  if (!aliases.length) return [];
+  const aliasOrder = new Map<string, number>(
+    aliases.map((alias, idx) => [alias, idx]),
+  );
+
+  try {
+    const freshness = await prisma.$queryRaw<
+      Array<{ season: string; max_updated: Date | string | null }>
+    >(
+      Prisma.sql`
+        select season, max(updated_at) as max_updated
+        from nba_players
+        where season in (${Prisma.join(aliases)})
+        group by season
+      `,
+    );
+    const freshestAlias = freshness
+      .map((row) => {
+        const ts = Date.parse(String(row.max_updated ?? ""));
+        return {
+          season: row.season,
+          ts: Number.isFinite(ts) ? ts : 0,
+          order: aliasOrder.get(row.season) ?? Number.MAX_SAFE_INTEGER,
+        };
+      })
+      .sort((a, b) => {
+        if (b.ts !== a.ts) return b.ts - a.ts;
+        return a.order - b.order;
+      })[0]?.season;
+
+    if (!freshestAlias) return [];
+
+    const rows = await prisma.$queryRaw<NbaPlayerDbRow[]>`
+      select
+        player_id,
+        season,
+        full_name,
+        first_name,
+        last_name,
+        team_id,
+        team_name,
+        team_code,
+        position,
+        jersey_number,
+        age,
+        height,
+        weight,
+        nationality,
+        birth_date,
+        is_active
+      from nba_players
+      where season = ${freshestAlias}
+      order by full_name asc
+    `;
+    if (rows.length) return rows.map(mapDbRowToPlayer);
+  } catch {
+    // ignore and fallback below
+  }
+
+  for (const alias of aliases) {
     try {
       const rows = await prisma.$queryRaw<NbaPlayerDbRow[]>`
         select
@@ -326,7 +395,42 @@ export async function readNbaPlayerByIdFromDb(
   playerId: number,
 ): Promise<NbaPlayerRecord | null> {
   await ensureNbaPlayersTable();
-  for (const alias of nbaSeasonAliases(season)) {
+  const aliases = nbaSeasonAliases(season);
+  if (!aliases.length) return null;
+
+  try {
+    const rows = await prisma.$queryRaw<NbaPlayerDbRow[]>(
+      Prisma.sql`
+        select
+          player_id,
+          season,
+          full_name,
+          first_name,
+          last_name,
+          team_id,
+          team_name,
+          team_code,
+          position,
+          jersey_number,
+          age,
+          height,
+          weight,
+          nationality,
+          birth_date,
+          is_active
+        from nba_players
+        where player_id = ${playerId}
+          and season in (${Prisma.join(aliases)})
+        order by updated_at desc nulls last
+        limit 1
+      `,
+    );
+    if (rows.length) return mapDbRowToPlayer(rows[0]);
+  } catch {
+    // ignore and fallback below
+  }
+
+  for (const alias of aliases) {
     try {
       const rows = await prisma.$queryRaw<NbaPlayerDbRow[]>`
         select
@@ -379,4 +483,46 @@ export async function readNbaPlayerIdsFromDb(season: string): Promise<number[]> 
     }
   }
   return Array.from(ids.values()).sort((a, b) => a - b);
+}
+
+export async function pruneNbaPlayersForSeason({
+  season,
+  keepPlayerIds,
+  minKeepCount = 350,
+}: PruneNbaPlayersParams): Promise<{
+  kept: number;
+  deleted: number;
+  skipped: boolean;
+}> {
+  await ensureNbaPlayersTable();
+  const keepIds = Array.from(
+    new Set(
+      keepPlayerIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .map((id) => Math.trunc(id)),
+    ),
+  );
+  if (keepIds.length < minKeepCount) {
+    return { kept: keepIds.length, deleted: 0, skipped: true };
+  }
+
+  const aliases = nbaSeasonAliases(season);
+  if (!aliases.length) {
+    return { kept: keepIds.length, deleted: 0, skipped: true };
+  }
+
+  const deleted = await prisma.$executeRaw<number>(
+    Prisma.sql`
+      delete from nba_players
+      where season in (${Prisma.join(aliases.map((alias) => Prisma.sql`${alias}`))})
+        and player_id not in (${Prisma.join(keepIds.map((id) => Prisma.sql`${id}`))})
+    `,
+  );
+
+  return {
+    kept: keepIds.length,
+    deleted: Number(deleted ?? 0),
+    skipped: false,
+  };
 }

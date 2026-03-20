@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.APISPORTS_BASKETBALL_URL ||
-  process.env.APISPORTS_NBA_URL ||
-  "https://v1.basketball.api-sports.io";
+  process.env.APISPORTS_NBA_URL || "https://v2.nba.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const DEFAULT_SEASON =
-  process.env.APISPORTS_BASKETBALL_SEASON ??
-  process.env.APISPORTS_NBA_SEASON ??
-  "2025";
-const LEAGUE_ID = 12; // NBA on basketball v1
+  process.env.APISPORTS_NBA_SEASON ?? "2025";
 const MEMORY_CACHE_TTL_MS = 5 * 60 * 1000;
-const IS_BASKETBALL_V1 = API_BASE.includes("basketball");
 
 type ApiTeamSide = {
   id?: number | null;
@@ -106,7 +100,6 @@ function getTeamSides(g: ApiGame) {
 }
 
 async function resolveTeamIdForApi(teamId: number): Promise<number> {
-  if (IS_BASKETBALL_V1) return teamId;
   const code = CODE_BY_TEAM_ID[teamId];
   if (!code) return teamId;
   if (dynamicTeamIdCache.has(code)) return dynamicTeamIdCache.get(code)!;
@@ -142,7 +135,7 @@ async function resolveTeamIdForApi(teamId: number): Promise<number> {
   return fallback;
 }
 
-// Correspondance des IDs basket v1 (12=NBA) -> codes équipes
+// Correspondance des IDs Betalyze -> codes équipes
 const CODE_BY_TEAM_ID: Record<number, string> = {
   132: "ATL",
   133: "BOS",
@@ -210,12 +203,6 @@ const V2_TEAM_ID_BY_CODE: Record<string, number> = {
   UTA: 40,
 };
 
-function resolveV2TeamId(teamId: number): number {
-  const code = CODE_BY_TEAM_ID[teamId];
-  if (!code) return teamId;
-  return V2_TEAM_ID_BY_CODE[code] ?? teamId;
-}
-
 const FALLBACK_OPPONENTS: Array<{ id: number; name: string }> = [
   { id: 145, name: "Lakers" },
   { id: 133, name: "Celtics" },
@@ -260,19 +247,10 @@ function buildFallbackSummary(teamId: number, season: string): TeamSummary {
 
 export async function GET(
   req: Request,
-  { params }: { params: { id?: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const urlReq = new URL(req.url);
-
-  const extractId = (): string | null => {
-    if (params?.id) return params.id;
-    const fromQuery = urlReq.searchParams.get("id") ?? urlReq.searchParams.get("team");
-    if (fromQuery) return fromQuery;
-    const match = urlReq.pathname.match(/\/teams\/([^/]+)\/summary/);
-    return match ? match[1] : null;
-  };
-
-  const teamId = extractId();
+  const { id: teamId } = await params;
   if (!teamId) {
     return NextResponse.json(
       { error: "Missing team id" },
@@ -306,16 +284,10 @@ export async function GET(
   try {
     const attempts: Array<{ url: string; results?: number; errors?: any }> = [];
     const seasonYear = season.match(/(\d{4})/)?.[1] ?? season;
-    const seasonSpan =
-      seasonYear && /^\d{4}$/.test(seasonYear)
-        ? `${seasonYear}-${Number(seasonYear) + 1}`
-        : null;
     const seasonInt =
       seasonYear && /^\d{4}$/.test(seasonYear) ? Number(seasonYear) : null;
     const targetSeason = seasonInt ? String(seasonInt) : season;
-    const seasonsToTry = IS_BASKETBALL_V1
-      ? Array.from(new Set([seasonSpan, season, seasonYear])).filter(Boolean)
-      : [targetSeason];
+    const seasonsToTry = [targetSeason];
 
     const requestedSeason = seasonsToTry[0];
     let gamesResponse: ApiGame[] = [];
@@ -421,6 +393,20 @@ export async function GET(
           (typeof g.league?.name === "string" &&
             g.league.name.toLowerCase().includes("pre"));
 
+        const rawStatus = g.status?.short;
+        const statusShort =
+          typeof rawStatus === "number"
+            ? rawStatus === 3
+              ? "FT"
+              : rawStatus === 2
+                ? "LIVE"
+                : rawStatus === 1
+                  ? "NS"
+                  : String(rawStatus)
+            : typeof rawStatus === "string"
+              ? rawStatus.toUpperCase()
+              : null;
+
         return {
           gameId: g.id,
           date: normalizedDate,
@@ -437,10 +423,7 @@ export async function GET(
           pointsAgainst,
           isScheduled: homeScore === null || awayScore === null,
           isPreseason: Boolean(isPre),
-          statusShort:
-            typeof g.status?.short === "number"
-              ? String(g.status?.short)
-              : (g.status?.short as any) ?? null,
+          statusShort,
         };
       })
       .sort((a, b) => {

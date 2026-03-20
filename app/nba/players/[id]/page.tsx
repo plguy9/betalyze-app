@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Shield, SlidersHorizontal, Sparkles } from "lucide-react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 type NbaPlayer = {
   id?: number | string;
@@ -108,8 +108,18 @@ type NextGame = {
   venue?: string | { name?: string | null; city?: string | null } | null;
   status?: { short?: string | null; long?: string | null } | null;
   teams?: {
-    home?: { id?: number | null; name?: string | null; logo?: string | null };
-    away?: { id?: number | null; name?: string | null; logo?: string | null };
+    home?: {
+      id?: number | null;
+      name?: string | null;
+      logo?: string | null;
+      code?: string | null;
+    };
+    away?: {
+      id?: number | null;
+      name?: string | null;
+      logo?: string | null;
+      code?: string | null;
+    };
   } | null;
 };
 
@@ -180,7 +190,7 @@ type OverviewTileProps = {
 };
 
 const DEFAULT_SEASON =
-  process.env.NEXT_PUBLIC_APISPORTS_BASKETBALL_SEASON ?? "2025-2026";
+  process.env.NEXT_PUBLIC_APISPORTS_NBA_SEASON ?? "2025";
 const DEFAULT_ODDS_BOOKMAKER = "fanduel";
 
 const ODDS_METRIC_ALIASES: Record<TrendMetricKey, string[]> = {
@@ -289,6 +299,39 @@ const APISPORTS_TEAM_ID_BY_CODE: Record<string, number> = {
   TOR: 159,
   UTA: 160,
   WAS: 161,
+};
+
+const TEAM_FULL_NAME_BY_CODE: Record<string, string> = {
+  ATL: "Atlanta Hawks",
+  BOS: "Boston Celtics",
+  BKN: "Brooklyn Nets",
+  CHA: "Charlotte Hornets",
+  CHI: "Chicago Bulls",
+  CLE: "Cleveland Cavaliers",
+  DAL: "Dallas Mavericks",
+  DEN: "Denver Nuggets",
+  DET: "Detroit Pistons",
+  GSW: "Golden State Warriors",
+  HOU: "Houston Rockets",
+  IND: "Indiana Pacers",
+  LAC: "Los Angeles Clippers",
+  LAL: "Los Angeles Lakers",
+  MEM: "Memphis Grizzlies",
+  MIA: "Miami Heat",
+  MIL: "Milwaukee Bucks",
+  MIN: "Minnesota Timberwolves",
+  NOP: "New Orleans Pelicans",
+  NYK: "New York Knicks",
+  OKC: "Oklahoma City Thunder",
+  ORL: "Orlando Magic",
+  PHI: "Philadelphia 76ers",
+  PHX: "Phoenix Suns",
+  POR: "Portland Trail Blazers",
+  SAC: "Sacramento Kings",
+  SAS: "San Antonio Spurs",
+  TOR: "Toronto Raptors",
+  UTA: "Utah Jazz",
+  WAS: "Washington Wizards",
 };
 
 const getNbaCdnLogo = (code?: string | null) => {
@@ -511,6 +554,14 @@ function normalizePlayerName(value: string) {
     .trim();
 }
 
+function normalizeTeamLabel(value: string | null | undefined) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeBookmakerKey(value: string | null | undefined) {
   return String(value ?? "")
     .toLowerCase()
@@ -550,6 +601,57 @@ function normalizeNbaDvpPosition(raw: string | null | undefined): NbaDvpPosition
   if (value.includes("FORWARD")) return "F";
   if (value.includes("GUARD")) return "G";
   return null;
+}
+
+const FINISHED_GAME_STATUSES = new Set([
+  "FT",
+  "AOT",
+  "AET",
+  "CANC",
+  "CAN",
+  "POST",
+  "ABD",
+  "SUSP",
+]);
+
+const LIVE_GAME_STATUSES = new Set([
+  "LIVE",
+  "Q1",
+  "Q2",
+  "Q3",
+  "Q4",
+  "1Q",
+  "2Q",
+  "3Q",
+  "4Q",
+  "HT",
+  "OT",
+  "1",
+  "2",
+]);
+
+function normalizeGameStatus(value: string | null | undefined) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function isLikelyLiveGame(game: NextGame | null, nowUnix: number) {
+  if (!game) return false;
+  const statusShort = normalizeGameStatus(game.status?.short ?? null);
+  const statusLong = String(game.status?.long ?? "").trim().toLowerCase();
+  const ts = Number(game.timestamp ?? NaN);
+  if (LIVE_GAME_STATUSES.has(statusShort)) return true;
+  if (statusShort === "NS") return false;
+  if (
+    statusLong.includes("in play") ||
+    statusLong.includes("halftime") ||
+    statusLong.includes("quarter") ||
+    statusLong.includes("overtime") ||
+    statusLong.includes("live")
+  ) {
+    return true;
+  }
+  if (!Number.isFinite(ts)) return false;
+  return ts <= nowUnix && ts >= nowUnix - 4 * 60 * 60;
 }
 
 const hexToRgba = (hex: string, alpha: number) => {
@@ -601,6 +703,7 @@ function OverviewTile({ label, value, tone, subLeft, subRight }: OverviewTilePro
 }
 
 export default function PlayerPage() {
+  const router = useRouter();
   const params = useParams<{ id?: string | string[] }>();
   const searchParams = useSearchParams();
   const requestedTrendMetric = useMemo(
@@ -722,6 +825,7 @@ export default function PlayerPage() {
             )}`,
             {
               signal: controller.signal,
+              cache: "no-store",
             },
           );
           if (res.ok) {
@@ -812,6 +916,7 @@ export default function PlayerPage() {
             )}`,
             {
               signal: controller.signal,
+              cache: "no-store",
             },
           );
           if (res.ok) {
@@ -908,27 +1013,21 @@ export default function PlayerPage() {
         const json = await res.json();
         const games: NextGame[] = Array.isArray(json?.response) ? json.response : [];
         const now = Math.floor(Date.now() / 1000);
-        const futureGames = games
+        const candidates = games
           .filter((g) => {
             const ts = Number(g?.timestamp ?? 0);
             if (!ts) return false;
-            const status = String(g?.status?.short ?? "");
-            if (
-              status === "FT" ||
-              status === "AOT" ||
-              status === "AET" ||
-              status === "CANC" ||
-              status === "CAN" ||
-              status === "POST" ||
-              status === "ABD" ||
-              status === "SUSP"
-            ) {
-              return false;
-            }
-            return ts >= now;
+            const status = normalizeGameStatus(g?.status?.short ?? null);
+            return !FINISHED_GAME_STATUSES.has(status);
           })
           .sort((a, b) => Number(a?.timestamp ?? 0) - Number(b?.timestamp ?? 0));
-        const picked = futureGames[0] ?? null;
+        const liveCandidates = candidates
+          .filter((g) => isLikelyLiveGame(g, now))
+          .sort((a, b) => Number(b?.timestamp ?? 0) - Number(a?.timestamp ?? 0));
+        const futureGames = candidates
+          .filter((g) => Number(g?.timestamp ?? 0) >= now)
+          .sort((a, b) => Number(a?.timestamp ?? 0) - Number(b?.timestamp ?? 0));
+        const picked = liveCandidates[0] ?? futureGames[0] ?? null;
         if (!picked) {
           setNextGame(null);
           return;
@@ -957,8 +1056,18 @@ export default function PlayerPage() {
   useEffect(() => {
     const controller = new AbortController();
     const fetchOdds = async () => {
-      const homeName = String(nextGame?.teams?.home?.name ?? "").trim();
-      const awayName = String(nextGame?.teams?.away?.name ?? "").trim();
+      const homeCode = String(nextGame?.teams?.home?.code ?? "")
+        .trim()
+        .toUpperCase();
+      const awayCode = String(nextGame?.teams?.away?.code ?? "")
+        .trim()
+        .toUpperCase();
+      const homeNameRaw = String(nextGame?.teams?.home?.name ?? "").trim();
+      const awayNameRaw = String(nextGame?.teams?.away?.name ?? "").trim();
+      const homeName =
+        homeNameRaw || (homeCode ? TEAM_FULL_NAME_BY_CODE[homeCode] ?? "" : "");
+      const awayName =
+        awayNameRaw || (awayCode ? TEAM_FULL_NAME_BY_CODE[awayCode] ?? "" : "");
       const gameRaw = requestedGameId ?? nextGame?.id ?? null;
       const gameId = Number(gameRaw ?? NaN);
       const canUseTeams = Boolean(homeName && awayName);
@@ -972,6 +1081,8 @@ export default function PlayerPage() {
         if (Number.isFinite(gameId)) {
           url.searchParams.set("game", String(gameId));
         }
+        // Player page should only consume daily synced odds cache (no upstream odds refresh).
+        url.searchParams.set("cacheOnly", "1");
         if (selectedBookmaker) url.searchParams.set("bookmaker", selectedBookmaker);
         if (homeName) url.searchParams.set("home", homeName);
         if (awayName) url.searchParams.set("away", awayName);
@@ -1013,7 +1124,9 @@ export default function PlayerPage() {
   }, [
     requestedGameId,
     nextGame?.id,
+    nextGame?.teams?.home?.code,
     nextGame?.teams?.home?.name,
+    nextGame?.teams?.away?.code,
     nextGame?.teams?.away?.name,
     selectedBookmaker,
   ]);
@@ -1041,27 +1154,109 @@ export default function PlayerPage() {
   const teamPrimarySoft = hexToRgba(teamPrimary, 0.2);
   const teamPrimaryLine = hexToRgba(teamPrimary, 0.45);
 
-  const nextGameIsHome =
-    nextGame?.teams?.home?.id !== null &&
-    nextGame?.teams?.home?.id !== undefined &&
-    teamId !== null &&
-    teamId !== undefined &&
-    Number(nextGame.teams.home.id) === Number(teamId);
-  const nextGameOpp = nextGameIsHome ? nextGame?.teams?.away : nextGame?.teams?.home;
+  const nextGameHomeCode = String(nextGame?.teams?.home?.code ?? "")
+    .trim()
+    .toUpperCase();
+  const nextGameAwayCode = String(nextGame?.teams?.away?.code ?? "")
+    .trim()
+    .toUpperCase();
+  const nextGameHomeName = String(nextGame?.teams?.home?.name ?? "").trim();
+  const nextGameAwayName = String(nextGame?.teams?.away?.name ?? "").trim();
+  const teamCodeUpper = String(teamCode ?? "")
+    .trim()
+    .toUpperCase();
+  const teamNameNorm = normalizeTeamLabel(teamName);
+
+  const nextGamePlayerSide = useMemo<"home" | "away" | null>(() => {
+    const homeId = Number(nextGame?.teams?.home?.id ?? NaN);
+    const awayId = Number(nextGame?.teams?.away?.id ?? NaN);
+    const currentTeamId = Number(teamId ?? NaN);
+    if (Number.isFinite(homeId) && Number.isFinite(currentTeamId) && homeId === currentTeamId) {
+      return "home";
+    }
+    if (Number.isFinite(awayId) && Number.isFinite(currentTeamId) && awayId === currentTeamId) {
+      return "away";
+    }
+
+    if (teamCodeUpper) {
+      if (nextGameHomeCode && nextGameHomeCode === teamCodeUpper) return "home";
+      if (nextGameAwayCode && nextGameAwayCode === teamCodeUpper) return "away";
+    }
+
+    if (teamNameNorm) {
+      const homeNorm = normalizeTeamLabel(nextGameHomeName);
+      const awayNorm = normalizeTeamLabel(nextGameAwayName);
+      if (
+        homeNorm &&
+        (homeNorm === teamNameNorm ||
+          homeNorm.includes(teamNameNorm) ||
+          teamNameNorm.includes(homeNorm))
+      ) {
+        return "home";
+      }
+      if (
+        awayNorm &&
+        (awayNorm === teamNameNorm ||
+          awayNorm.includes(teamNameNorm) ||
+          teamNameNorm.includes(awayNorm))
+      ) {
+        return "away";
+      }
+    }
+
+    return null;
+  }, [
+    nextGame?.teams?.home?.id,
+    nextGame?.teams?.away?.id,
+    nextGameHomeCode,
+    nextGameAwayCode,
+    nextGameHomeName,
+    nextGameAwayName,
+    teamCodeUpper,
+    teamId,
+    teamNameNorm,
+  ]);
+  const nextGameIsHome = nextGamePlayerSide === "home";
+  const nextGameOpp =
+    nextGamePlayerSide === "home"
+      ? nextGame?.teams?.away
+      : nextGamePlayerSide === "away"
+      ? nextGame?.teams?.home
+      : nextGame?.teams?.home ?? nextGame?.teams?.away ?? null;
   const nextGameOppId =
     nextGameOpp?.id !== null && nextGameOpp?.id !== undefined
       ? Number(nextGameOpp.id)
       : null;
   const nextGameOppMeta = nextGameOppId ? teamMetaById.get(nextGameOppId) : null;
-  const nextGameOppCode = nextGameOppMeta?.code ?? null;
+  const nextGameOppCodeFromName = nextGameOpp?.name
+    ? teamAbbrByName.get(nextGameOpp.name.toLowerCase()) ?? null
+    : null;
+  const nextGameOppCodeRaw = String(nextGameOpp?.code ?? "")
+    .trim()
+    .toUpperCase();
+  const nextGameOppCode =
+    nextGameOppMeta?.code ??
+    (nextGameOppCodeRaw || null) ??
+    nextGameOppCodeFromName ??
+    null;
   const nextGameOppName =
-    nextGameOpp?.name ?? nextGameOppMeta?.fullName ?? nextGameOppMeta?.name ?? null;
+    nextGameOpp?.name ??
+    (nextGameOppCode
+      ? teamMetaByCode.get(nextGameOppCode)?.fullName ??
+        teamMetaByCode.get(nextGameOppCode)?.name ??
+        TEAM_FULL_NAME_BY_CODE[nextGameOppCode] ??
+        null
+      : null) ??
+    nextGameOppMeta?.fullName ??
+    nextGameOppMeta?.name ??
+    null;
   const nextGameOppLogo =
-    getNbaCdnLogo(nextGameOppMeta?.code ?? null) ??
+    getNbaCdnLogo(nextGameOppMeta?.code ?? nextGameOppCode ?? null) ??
     nextGameOpp?.logo ??
     nextGameOppMeta?.logo ??
     null;
-  const nextGameHomeAway = nextGame ? (nextGameIsHome ? "vs" : "@") : "";
+  const nextGameHomeAway =
+    nextGame && nextGamePlayerSide ? (nextGameIsHome ? "vs" : "@") : "";
   const nextGameDate = nextGame?.timestamp
     ? new Date(nextGame.timestamp * 1000)
     : nextGame?.date
@@ -1077,6 +1272,7 @@ export default function PlayerPage() {
   const nextGameTimeLabel = nextGameDate
     ? nextGameDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
     : "";
+  const nextGameIsLive = isLikelyLiveGame(nextGame, Math.floor(Date.now() / 1000));
   const nextGameVenueName =
     typeof nextGame?.venue === "string"
       ? nextGame.venue
@@ -1087,11 +1283,14 @@ export default function PlayerPage() {
     ? `${nextGameVenueName}${nextGameVenueCity ? ` · ${nextGameVenueCity}` : ""}`
     : null;
 
-  const opponentCode =
+  const opponentCodeRaw =
     requestedOpponentCode ??
     nextGameOppCode ??
     summary?.games?.[0]?.opponentTeamCode ??
     null;
+  const opponentCode = opponentCodeRaw
+    ? String(opponentCodeRaw).trim().toUpperCase()
+    : null;
   const oppPrimary = getTeamPrimaryColor(opponentCode ?? null);
   const oppPrimarySoft = hexToRgba(oppPrimary, 0.2);
   const oppPrimaryRing = hexToRgba(oppPrimary, 0.4);
@@ -1110,7 +1309,26 @@ export default function PlayerPage() {
             APISPORTS_TEAM_ID_BY_CODE[requestedOpponentCode],
         )
       : null;
-  const effectiveOppTeamId = forcedOppTeamId ?? nextGameOppId;
+  const opponentCodeTeamId =
+    opponentCode &&
+    Number.isFinite(
+      Number(
+        apiSportsTeamIdByCode.get(opponentCode) ??
+          APISPORTS_TEAM_ID_BY_CODE[opponentCode] ??
+          NaN,
+      ),
+    )
+      ? Number(
+          apiSportsTeamIdByCode.get(opponentCode) ??
+            APISPORTS_TEAM_ID_BY_CODE[opponentCode],
+        )
+      : null;
+  const effectiveOppTeamCode =
+    (requestedOpponentCode ? String(requestedOpponentCode).trim().toUpperCase() : null) ??
+    opponentCode ??
+    (nextGameOppCode ? String(nextGameOppCode).trim().toUpperCase() : null) ??
+    null;
+  const effectiveOppTeamId = forcedOppTeamId ?? opponentCodeTeamId ?? nextGameOppId;
   const dvpWindowForTrend = useMemo(() => {
     if (trendWindow === "L5") return "L5";
     if (trendWindow === "L10") return "L10";
@@ -1120,7 +1338,7 @@ export default function PlayerPage() {
   useEffect(() => {
     const controller = new AbortController();
     const fetchDvp = async () => {
-      if (!dvpPosition || !effectiveOppTeamId) {
+      if (!dvpPosition || (!effectiveOppTeamId && !effectiveOppTeamCode)) {
         setDvpRow(null);
         setDvpTotalTeams(null);
         setDvpLeagueAvg(null);
@@ -1148,7 +1366,19 @@ export default function PlayerPage() {
         }
         const json = (await res.json()) as { rows?: NbaDvpRow[] };
         const rows = Array.isArray(json?.rows) ? json.rows : [];
-        const match = rows.find((row) => Number(row.teamId) === Number(effectiveOppTeamId)) ?? null;
+        const match =
+          rows.find((row) => {
+            const rowCode = String(row.teamAbbr ?? "")
+              .trim()
+              .toUpperCase();
+            if (effectiveOppTeamCode && rowCode && rowCode === effectiveOppTeamCode) {
+              return true;
+            }
+            if (effectiveOppTeamId) {
+              return Number(row.teamId) === Number(effectiveOppTeamId);
+            }
+            return false;
+          }) ?? null;
         setDvpRowsForPosition(rows);
         setDvpTotalTeams(rows.length || null);
         setDvpRow(match);
@@ -1212,7 +1442,7 @@ export default function PlayerPage() {
     };
     fetchDvp();
     return () => controller.abort();
-  }, [season, dvpWindowForTrend, dvpPosition, effectiveOppTeamId]);
+  }, [season, dvpWindowForTrend, dvpPosition, effectiveOppTeamId, effectiveOppTeamCode]);
 
   const overviewWindow = useMemo(() => {
     if (overviewRange === "Last 5") return summary?.last5 ?? null;
@@ -1547,7 +1777,7 @@ export default function PlayerPage() {
     return "neutral";
   }, [dvpMetricDelta]);
   const trendNote = useMemo(() => {
-    if (!hasScoringLine) return null;
+    if (!hasSelectedOddsMarket) return null;
     if (!Number.isFinite(noteAvg ?? NaN) || !Number.isFinite(lineForMetric ?? NaN)) return null;
     const line = Number(lineForMetric);
     const lineEdge = line > 0 ? clamp(((Number(noteAvg) - line) / line) * 40, -20, 20) : 0;
@@ -1599,7 +1829,7 @@ export default function PlayerPage() {
       lineDeltaPct,
     };
   }, [
-    hasScoringLine,
+    hasSelectedOddsMarket,
     noteAvg,
     lineForMetric,
     noteHitPct,
@@ -1650,7 +1880,9 @@ export default function PlayerPage() {
       return true;
     });
   }, [oddsPayload]);
-  const dvpEffectiveRank = dvpMetricRank ?? dvpRow?.rank ?? null;
+  // Keep the displayed DvP rank aligned with the main DvP table (global BTP rank).
+  // Metric-specific ranks are still used for internal trend scoring.
+  const dvpEffectiveRank = dvpRow?.rank ?? dvpMetricRank ?? null;
   const dvpTier = useMemo(() => {
     const rank = dvpEffectiveRank;
     if (!rank) {
@@ -1860,6 +2092,12 @@ export default function PlayerPage() {
   }, [dvpPerGame, dvpLeagueAvg, dvpRow, dvpRowsForPosition]);
 
   const showLoadingState = loading || (!summary && !error);
+  const handleBackToNba = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      event.preventDefault();
+      router.back();
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#06060a] text-slate-100">
@@ -1871,6 +2109,7 @@ export default function PlayerPage() {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/nba"
+            onClick={handleBackToNba}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -1947,9 +2186,6 @@ export default function PlayerPage() {
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/75">
-                          {teamLabel}
-                        </span>
                         {dataPlayer?.jerseyNumber && (
                           <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/75">
                             #{dataPlayer.jerseyNumber}
@@ -1960,19 +2196,11 @@ export default function PlayerPage() {
                             {dataPlayer.position}
                           </span>
                         )}
-                        {dataPlayer?.age != null && (
-                          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/75">
-                            Age {dataPlayer.age}
-                          </span>
-                        )}
                         {dataPlayer?.nationality && (
                           <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/75">
                             {dataPlayer.nationality}
                           </span>
                         )}
-                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">
-                          N/A
-                        </span>
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-200">
                           {typeof dataPlayer?.isActive === "boolean"
                             ? dataPlayer.isActive
@@ -2118,7 +2346,7 @@ export default function PlayerPage() {
                       className="h-1.5 w-1.5 rounded-full"
                       style={{ backgroundColor: oppPrimary }}
                     />
-                    Prochain match
+                    {nextGameIsLive ? "Match en direct" : "Prochain match"}
                   </p>
                   {nextGameLoading ? (
                     <>
@@ -2143,7 +2371,7 @@ export default function PlayerPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-[10px] text-slate-500">
-                        {nextGameDateLabel}
+                        {nextGameIsLive ? "En direct" : nextGameDateLabel}
                         {nextGameTimeLabel ? ` · ${nextGameTimeLabel}` : ""}
                       </p>
                       {nextGameVenueLabel && (

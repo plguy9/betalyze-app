@@ -11,8 +11,7 @@ import {
 } from "@/lib/supabase/nba-odds-cache";
 
 const API_KEY = process.env.APISPORTS_KEY;
-const API_BASE =
-  process.env.APISPORTS_BASKETBALL_URL || "https://v1.basketball.api-sports.io";
+const API_BASE = process.env.APISPORTS_NBA_URL || "https://v2.nba.api-sports.io";
 const SGO_API_KEY = process.env.SPORTSGAMEODDS_API_KEY;
 const SGO_API_BASE =
   process.env.SPORTSGAMEODDS_API_URL || "https://api.sportsgameodds.com/v2";
@@ -24,17 +23,18 @@ const THE_ODDS_API_KEY = process.env.THE_ODDS_API_KEY ?? process.env.ODDS_API_KE
 const THE_ODDS_API_BASE = process.env.ODDS_API_URL || "https://api.the-odds-api.com/v4";
 const THE_ODDS_NBA_SPORT = "basketball_nba";
 const THE_ODDS_REGIONS = "us";
+const QUERY_TIMEZONE = "America/Toronto";
 const THE_ODDS_DEFAULT_MARKETS = [
-  "totals",
-  "spreads",
   "player_points",
+  "player_points_alternate",
   "player_rebounds",
+  "player_rebounds_alternate",
   "player_assists",
-  "player_threes",
+  "player_assists_alternate",
   "player_points_rebounds_assists",
-  "player_points_assists",
-  "player_points_rebounds",
-  "player_rebounds_assists",
+  "player_points_rebounds_assists_alternate",
+  "player_threes",
+  "player_threes_alternate",
 ].join(",");
 
 type OddsValue = {
@@ -87,12 +87,19 @@ type TheOddsEvent = {
   id?: string | null;
   home_team?: string | null;
   away_team?: string | null;
+  commence_time?: string | null;
+  eventID?: string | null;
+  teams?: {
+    home?: { names?: { long?: string | null } | null } | null;
+    away?: { names?: { long?: string | null } | null } | null;
+  } | null;
   bookmakers?: TheOddsBookmaker[] | null;
 };
 
 type SgoBookData = {
   odds?: string | number | null;
   overUnder?: string | number | null;
+  spread?: string | number | null;
   available?: boolean | null;
 };
 
@@ -104,15 +111,19 @@ type SgoOdd = {
   betTypeID?: string | null;
   sideID?: string | null;
   bookOverUnder?: string | number | null;
+  openBookOverUnder?: string | number | null;
+  bookSpread?: string | number | null;
+  openBookSpread?: string | number | null;
   bookOdds?: string | number | null;
+  openBookOdds?: string | number | null;
   byBookmaker?: Record<string, SgoBookData> | null;
 };
 
 type SgoEvent = {
   eventID?: string | null;
   teams?: {
-    home?: { names?: { long?: string | null; short?: string | null } | null } | null;
-    away?: { names?: { long?: string | null; short?: string | null } | null } | null;
+    home?: { teamID?: string | null; names?: { long?: string | null; short?: string | null } | null } | null;
+    away?: { teamID?: string | null; names?: { long?: string | null; short?: string | null } | null } | null;
   } | null;
   status?: { startsAt?: string | null } | null;
   players?: Record<
@@ -129,6 +140,7 @@ type PlayerProp = {
   odd: string | null;
   overOdd?: string | null;
   underOdd?: string | null;
+  isAlternate?: boolean | null;
   teamCode?: string | null;
   opponentCode?: string | null;
   bookmakerId?: number | null;
@@ -141,6 +153,13 @@ type BookmakerOption = {
 };
 
 type OddsCacheLayer = "memory" | "supabase" | "file" | "network";
+
+type MoneylinePayload = {
+  home: number | null;
+  away: number | null;
+  homeOpen: number | null;
+  awayOpen: number | null;
+};
 
 const PRIMARY_BOOKMAKER_PRIORITY = [
   "fanduel",
@@ -176,6 +195,14 @@ function bookmakerPriority(name: string | null | undefined) {
 function parseNumberFromValue(raw: string | null | undefined): number | null {
   if (!raw) return null;
   const match = raw.match(/([0-9]+(?:\.[0-9]+)?)/);
+  if (!match) return null;
+  const num = Number(match[1]);
+  return Number.isFinite(num) ? num : null;
+}
+
+function parseSignedNumberFromValue(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  const match = String(raw).match(/([+-]?[0-9]+(?:\.[0-9]+)?)/);
   if (!match) return null;
   const num = Number(match[1]);
   return Number.isFinite(num) ? num : null;
@@ -336,6 +363,33 @@ function extractSpread(
     return gapA - gapB;
   });
   return { side: preferred[0].side, line: preferred[0].line };
+}
+
+function extractMoneyline(bets: OddsBet[]): MoneylinePayload | null {
+  const target = bets.find((b) => {
+    const name = String(b.name ?? "").toLowerCase();
+    return (
+      name === "home/away" ||
+      name === "match winner" ||
+      name === "winner" ||
+      name.includes("moneyline")
+    );
+  });
+  if (!target?.values?.length) return null;
+
+  let home: number | null = null;
+  let away: number | null = null;
+
+  for (const v of target.values) {
+    const sideRaw = String(v.value ?? "").toLowerCase();
+    const odd = Number(v.odd);
+    if (!Number.isFinite(odd)) continue;
+    if (sideRaw.includes("home")) home = odd;
+    if (sideRaw.includes("away")) away = odd;
+  }
+
+  if (home === null && away === null) return null;
+  return { home, away, homeOpen: null, awayOpen: null };
 }
 
 function extractPlayerPropsFromBets(bets: OddsBet[]): PlayerProp[] {
@@ -565,6 +619,17 @@ function americanToDecimal(input: string | number | null | undefined): number | 
   return null;
 }
 
+function parseAmericanOdds(input: string | number | null | undefined): number | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === "number" && Number.isFinite(input)) return Math.trunc(input);
+  const raw = String(input).trim();
+  if (!raw) return null;
+  const match = raw.match(/([+-]?[0-9]+)/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
 function metricFromSgoStatId(raw: string | null | undefined): string | null {
   const statId = String(raw ?? "").toLowerCase();
   if (!statId) return null;
@@ -689,6 +754,15 @@ function getUtcDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function getDateKeyInTimezone(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function sgoCacheFilePath(dateKey: string) {
   return path.join(SGO_CACHE_DIR, `nba-events-${dateKey}.json`);
 }
@@ -734,7 +808,7 @@ async function fetchSgoEventsDailyCached(
 
   if (!refresh) {
     const supabaseCache = await readNbaOddsDailyCache(dateKey);
-    if (supabaseCache) {
+    if (supabaseCache && (supabaseCache.source ?? "sportsgameodds") === "sportsgameodds") {
       const events = supabaseCache.events as SgoEvent[];
       if (events.length > 0) {
         sgoMemoryCache.set(dateKey, {
@@ -787,7 +861,10 @@ async function fetchSgoOddsForMatch(
   selectionMode: "requested" | "fallback" | "auto";
   playerProps: PlayerProp[];
   total: number | null;
+  openingTotal: number | null;
   spread: { side: "home" | "away"; line: number } | null;
+  openingSpread: { side: "home" | "away"; line: number } | null;
+  moneyline: MoneylinePayload | null;
 } | null> {
   if (!SGO_API_KEY) return null;
   if (!home || !away) return null;
@@ -833,6 +910,9 @@ async function fetchSgoOddsForMatch(
       playerProps: [],
       total: null,
       spread: null,
+      openingTotal: null,
+      openingSpread: null,
+      moneyline: null,
     };
   }
 
@@ -847,33 +927,69 @@ async function fetchSgoOddsForMatch(
     .toUpperCase();
   const propsMap = new Map<string, PlayerProp>();
   let total: number | null = null;
+  let openingTotal: number | null = null;
+  let spreadHomeLine: number | null = null;
+  let openingSpreadHomeLine: number | null = null;
+  let moneylineHome: number | null = null;
+  let moneylineAway: number | null = null;
+  let openingMoneylineHome: number | null = null;
+  let openingMoneylineAway: number | null = null;
 
   for (const odd of Object.values(event.odds ?? {})) {
-    if (odd.periodID !== "game" || odd.betTypeID !== "ou") continue;
+    if (String(odd.periodID ?? "").toLowerCase() !== "game") continue;
     const bookDataRaw = odd.byBookmaker?.[selectedBook];
     if (!bookDataRaw || !bookDataRaw.available) continue;
+    const betType = String(odd.betTypeID ?? "").toLowerCase();
+    const statEntityId = String(odd.statEntityID ?? "").toLowerCase();
     const side = String(odd.sideID ?? "").toLowerCase();
-    if (side !== "over" && side !== "under") continue;
-    const lineNum = parseNumberFromValue(
-      String(bookDataRaw.overUnder ?? odd.bookOverUnder ?? ""),
-    );
+    const rawLine = String(bookDataRaw.overUnder ?? odd.bookOverUnder ?? "");
+
+    if (betType === "ou" && side !== "over" && side !== "under") continue;
+
+    if (betType === "ou" && statEntityId === "all" && String(odd.statID ?? "").toLowerCase() === "points") {
+      const current = parseNumberFromValue(rawLine);
+      const open = parseNumberFromValue(String(odd.openBookOverUnder ?? ""));
+      if (current !== null) total = current;
+      if (open !== null) openingTotal = open;
+    }
+
+    if (betType === "sp" && (statEntityId === "home" || statEntityId === "away")) {
+      const currentRaw = parseSignedNumberFromValue(bookDataRaw.spread ?? odd.bookSpread ?? null);
+      const openRaw = parseSignedNumberFromValue(odd.openBookSpread ?? null);
+      if (currentRaw !== null) {
+        spreadHomeLine = statEntityId === "home" ? currentRaw : -currentRaw;
+      }
+      if (openRaw !== null) {
+        openingSpreadHomeLine = statEntityId === "home" ? openRaw : -openRaw;
+      }
+    }
+
+    if (betType === "ml" && (statEntityId === "home" || statEntityId === "away")) {
+      const current = parseAmericanOdds(bookDataRaw.odds ?? odd.bookOdds);
+      const open = parseAmericanOdds(odd.openBookOdds ?? null);
+      if (statEntityId === "home") {
+        if (current !== null) moneylineHome = current;
+        if (open !== null) openingMoneylineHome = open;
+      } else {
+        if (current !== null) moneylineAway = current;
+        if (open !== null) openingMoneylineAway = open;
+      }
+    }
+
+    const lineNum = parseNumberFromValue(rawLine);
     if (lineNum === null) continue;
     const oddNum =
       americanToDecimal(bookDataRaw.odds) ?? americanToDecimal(odd.bookOdds) ?? null;
     const oddTxt = oddNum !== null ? oddNum.toFixed(2) : null;
 
-    const statEntityId = String(odd.statEntityID ?? "");
     const metric = metricFromSgoStatId(odd.statID);
     if (!metric) {
-      if (statEntityId.toLowerCase() === "all" && String(odd.statID ?? "").toLowerCase() === "points") {
-        total = lineNum;
-      }
       continue;
     }
-    if (!statEntityId || ["all", "home", "away"].includes(statEntityId.toLowerCase())) continue;
+    if (!statEntityId || ["all", "home", "away"].includes(statEntityId)) continue;
 
-    const player = event.players?.[statEntityId];
-    const playerName = player?.name?.trim() || displayNameFromPlayerId(statEntityId);
+    const player = event.players?.[statEntityId] ?? event.players?.[String(odd.statEntityID ?? "")];
+    const playerName = player?.name?.trim() || displayNameFromPlayerId(String(odd.statEntityID ?? ""));
     const playerTeamId = String(player?.teamID ?? "");
     let teamCode: string | null = null;
     let opponentCode: string | null = null;
@@ -905,6 +1021,47 @@ async function fetchSgoOddsForMatch(
     propsMap.set(key, current);
   }
 
+  const spread: { side: "home" | "away"; line: number } | null =
+    spreadHomeLine === null
+      ? null
+      : spreadHomeLine <= 0
+        ? { side: "home", line: spreadHomeLine }
+        : { side: "away", line: -spreadHomeLine };
+  const openingSpread: { side: "home" | "away"; line: number } | null =
+    openingSpreadHomeLine === null
+      ? null
+      : openingSpreadHomeLine <= 0
+        ? { side: "home", line: openingSpreadHomeLine }
+      : { side: "away", line: -openingSpreadHomeLine };
+
+  if (
+    moneylineHome !== null &&
+    openingMoneylineHome !== null &&
+    Math.sign(moneylineHome) !== 0 &&
+    Math.sign(openingMoneylineHome) !== 0 &&
+    Math.sign(moneylineHome) !== Math.sign(openingMoneylineHome)
+  ) {
+    openingMoneylineHome = -openingMoneylineHome;
+  }
+  if (
+    moneylineAway !== null &&
+    openingMoneylineAway !== null &&
+    Math.sign(moneylineAway) !== 0 &&
+    Math.sign(openingMoneylineAway) !== 0 &&
+    Math.sign(moneylineAway) !== Math.sign(openingMoneylineAway)
+  ) {
+    openingMoneylineAway = -openingMoneylineAway;
+  }
+  const moneyline: MoneylinePayload | null =
+    moneylineHome !== null || moneylineAway !== null || openingMoneylineHome !== null || openingMoneylineAway !== null
+      ? {
+          home: moneylineHome,
+          away: moneylineAway,
+          homeOpen: openingMoneylineHome,
+          awayOpen: openingMoneylineAway,
+        }
+      : null;
+
   return {
     ok: true,
     source: "sportsgameodds",
@@ -914,7 +1071,10 @@ async function fetchSgoOddsForMatch(
     selectionMode,
     playerProps: Array.from(propsMap.values()),
     total,
-    spread: null,
+    openingTotal,
+    spread,
+    openingSpread,
+    moneyline,
   };
 }
 
@@ -961,14 +1121,34 @@ function formatDecimalOdd(value: number | null | undefined): string | null {
 function metricFromTheOddsMarketKey(rawKey: string | null | undefined): string | null {
   const key = String(rawKey ?? "").toLowerCase();
   if (!key) return null;
-  if (key === "player_points") return "Points";
-  if (key === "player_rebounds") return "Rebounds";
-  if (key === "player_assists") return "Assists";
-  if (key === "player_threes") return "3PM";
-  if (key === "player_points_rebounds_assists") return "PRA";
-  if (key === "player_points_assists") return "P+A";
-  if (key === "player_points_rebounds") return "P+R";
-  if (key === "player_rebounds_assists") return "R+A";
+  if (key === "player_points" || key === "player_points_alternate") return "Points";
+  if (key === "player_rebounds" || key === "player_rebounds_alternate") return "Rebounds";
+  if (key === "player_assists" || key === "player_assists_alternate") return "Assists";
+  if (key === "player_threes" || key === "player_threes_alternate") return "3PM";
+  if (
+    key === "player_points_rebounds_assists" ||
+    key === "player_points_rebounds_assists_alternate"
+  ) {
+    return "PRA";
+  }
+  if (
+    key === "player_points_assists" ||
+    key === "player_points_assists_alternate"
+  ) {
+    return "P+A";
+  }
+  if (
+    key === "player_points_rebounds" ||
+    key === "player_points_rebounds_alternate"
+  ) {
+    return "P+R";
+  }
+  if (
+    key === "player_rebounds_assists" ||
+    key === "player_rebounds_assists_alternate"
+  ) {
+    return "R+A";
+  }
   return null;
 }
 
@@ -1020,6 +1200,8 @@ function extractPlayerPropsFromTheOddsBook(book: TheOddsBookmaker): PlayerProp[]
   for (const market of book.markets ?? []) {
     const metric = metricFromTheOddsMarketKey(market.key);
     if (!metric) continue;
+    const marketKey = String(market.key ?? "").toLowerCase();
+    const isAlternateMarket = marketKey.includes("_alternate");
     for (const outcome of market.outcomes ?? []) {
       const name = String(outcome.description ?? "").trim();
       if (!name) continue;
@@ -1035,12 +1217,14 @@ function extractPlayerPropsFromTheOddsBook(book: TheOddsBookmaker): PlayerProp[]
         odd: null,
         overOdd: null,
         underOdd: null,
+        isAlternate: isAlternateMarket,
         bookmakerId: null,
         bookmakerName: book.title ?? book.key ?? null,
       };
       if (side.includes("over")) current.overOdd = odd;
       if (side.includes("under")) current.underOdd = odd;
       current.odd = current.overOdd ?? current.underOdd ?? current.odd ?? odd;
+      current.isAlternate = Boolean(current.isAlternate) || isAlternateMarket;
       merged.set(key, current);
     }
   }
@@ -1092,6 +1276,27 @@ function extractSpreadFromTheOddsBook(
     : options;
   preferred.sort((a, b) => a.gap - b.gap);
   return { side: preferred[0].side, line: preferred[0].line };
+}
+
+function extractMoneylineFromTheOddsBook(
+  book: TheOddsBookmaker,
+  event: TheOddsEvent,
+): MoneylinePayload | null {
+  const market = (book.markets ?? []).find((m) => String(m.key ?? "") === "h2h");
+  if (!market?.outcomes?.length) return null;
+
+  let home: number | null = null;
+  let away: number | null = null;
+  for (const outcome of market.outcomes) {
+    const name = String(outcome.name ?? "");
+    const price = Number(outcome.price);
+    if (!Number.isFinite(price)) continue;
+    if (teamsMatch(name, event.home_team)) home = price;
+    if (teamsMatch(name, event.away_team)) away = price;
+  }
+
+  if (home === null && away === null) return null;
+  return { home, away, homeOpen: null, awayOpen: null };
 }
 
 async function resolveTheOddsEventId(
@@ -1152,12 +1357,159 @@ async function fetchTheOddsEventOdds(
   return json;
 }
 
+function getTeamNameFromTheOddsEvent(
+  event: TheOddsEvent,
+  side: "home" | "away",
+): string | null {
+  if (side === "home") {
+    const direct = String(event.home_team ?? "").trim();
+    if (direct) return direct;
+    const nested = String(event.teams?.home?.names?.long ?? "").trim();
+    return nested || null;
+  }
+  const direct = String(event.away_team ?? "").trim();
+  if (direct) return direct;
+  const nested = String(event.teams?.away?.names?.long ?? "").trim();
+  return nested || null;
+}
+
+function buildTheOddsResult(
+  eventOdds: TheOddsEvent,
+  params: {
+    fallbackHome: string;
+    fallbackAway: string;
+    bookmaker?: string | null;
+  },
+): {
+  bookmaker: { id: null; name: string | null };
+  availableBookmakers: BookmakerOption[];
+  total: number | null;
+  openingTotal: null;
+  spread: { side: "home" | "away"; line: number } | null;
+  openingSpread: null;
+  moneyline: MoneylinePayload | null;
+  playerProps: PlayerProp[];
+  selectionMode: "requested" | "fallback" | "auto";
+} | null {
+  const eventContext: TheOddsEvent = {
+    home_team:
+      getTeamNameFromTheOddsEvent(eventOdds, "home") ?? params.fallbackHome,
+    away_team:
+      getTeamNameFromTheOddsEvent(eventOdds, "away") ?? params.fallbackAway,
+  };
+  const books = eventOdds.bookmakers ?? [];
+
+  let selectionMode: "requested" | "fallback" | "auto" = params.bookmaker
+    ? "requested"
+    : "auto";
+  let selectedBook = pickTheOddsBookmaker(books, params.bookmaker);
+
+  if (params.bookmaker && (!selectedBook || !hasTheOddsPlayerProps(selectedBook))) {
+    selectedBook = pickTheOddsBookmaker(books, null);
+    if (selectedBook) selectionMode = "fallback";
+  }
+  if (!selectedBook) return null;
+
+  return {
+    bookmaker: {
+      id: null,
+      name: selectedBook.title ?? selectedBook.key ?? null,
+    },
+    availableBookmakers: getTheOddsAvailableBookmakers(books),
+    total: extractTotalFromTheOddsBook(selectedBook),
+    openingTotal: null,
+    spread: extractSpreadFromTheOddsBook(selectedBook, eventContext),
+    openingSpread: null,
+    moneyline: extractMoneylineFromTheOddsBook(selectedBook, eventContext),
+    playerProps: extractPlayerPropsFromTheOddsBook(selectedBook),
+    selectionMode,
+  };
+}
+
+function toObjectRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function normalizeCachedTheOddsEvent(raw: unknown): TheOddsEvent | null {
+  const obj = toObjectRecord(raw);
+  if (!obj) return null;
+  const teams = toObjectRecord(obj.teams);
+  const home = toObjectRecord(teams?.home);
+  const away = toObjectRecord(teams?.away);
+  const homeNames = toObjectRecord(home?.names);
+  const awayNames = toObjectRecord(away?.names);
+  const status = toObjectRecord(obj.status);
+
+  const homeTeam =
+    String(obj.home_team ?? "").trim() ||
+    String(homeNames?.long ?? "").trim();
+  const awayTeam =
+    String(obj.away_team ?? "").trim() ||
+    String(awayNames?.long ?? "").trim();
+  if (!homeTeam || !awayTeam) return null;
+
+  const id = String(obj.id ?? obj.eventID ?? "").trim() || null;
+  const commenceTime =
+    String(obj.commence_time ?? status?.startsAt ?? "").trim() || null;
+  const bookmakers = Array.isArray(obj.bookmakers)
+    ? (obj.bookmakers as TheOddsBookmaker[])
+    : [];
+
+  return {
+    id,
+    eventID: id,
+    home_team: homeTeam,
+    away_team: awayTeam,
+    commence_time: commenceTime,
+    bookmakers,
+  };
+}
+
+async function readTheOddsCachedEventForMatch(
+  home: string,
+  away: string,
+): Promise<{ event: TheOddsEvent; cacheLayer: OddsCacheLayer } | null> {
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const dateKeys = Array.from(
+    new Set([
+      getDateKeyInTimezone(now, QUERY_TIMEZONE),
+      getDateKeyInTimezone(new Date(now.getTime() - oneDayMs), QUERY_TIMEZONE),
+      getUtcDateKey(now),
+      getUtcDateKey(new Date(now.getTime() - oneDayMs)),
+    ]),
+  );
+
+  for (const dateKey of dateKeys) {
+    const cache = await readNbaOddsDailyCache(dateKey).catch(() => null);
+    if (!cache || !Array.isArray(cache.events)) continue;
+    const source = String(cache.source ?? "").toLowerCase();
+    if (source && source !== "the-odds-api") continue;
+
+    for (const raw of cache.events) {
+      const event = normalizeCachedTheOddsEvent(raw);
+      if (!event) continue;
+      const direct =
+        teamsMatch(event.home_team, home) && teamsMatch(event.away_team, away);
+      const reversed =
+        teamsMatch(event.home_team, away) && teamsMatch(event.away_team, home);
+      if (direct || reversed) {
+        return { event, cacheLayer: "supabase" };
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const game = params.get("game");
   const bookmaker = params.get("bookmaker");
   const home = params.get("home");
   const away = params.get("away");
+  const cacheOnly = params.get("cacheOnly") === "1";
 
   const emptyOdds = (reason?: string) =>
     NextResponse.json(
@@ -1167,7 +1519,10 @@ export async function GET(req: NextRequest) {
         bookmaker: null,
         availableBookmakers: [],
         total: null,
+        openingTotal: null,
         spread: null,
+        openingSpread: null,
+        moneyline: null,
         playerProps: [],
         requestedBookmaker: bookmaker ?? null,
         resolvedBookmakerId: null,
@@ -1180,178 +1535,126 @@ export async function GET(req: NextRequest) {
     );
 
   if (!game && !(home && away)) {
+    if (cacheOnly) return emptyOdds("cache_only_missing_home_away");
     return NextResponse.json({ error: "Missing game id" }, { status: 400 });
   }
 
   try {
-    if (home && away && SGO_API_KEY) {
-      const sgo = await fetchSgoOddsForMatch(home, away, bookmaker);
-      if (sgo) {
-        return NextResponse.json(
-          {
-            ok: sgo.ok,
-            game: game ? Number(game) : null,
-            bookmaker: sgo.bookmaker,
-            availableBookmakers: sgo.availableBookmakers,
-            total: sgo.total,
-            spread: sgo.spread,
-            playerProps: sgo.playerProps,
-            requestedBookmaker: bookmaker ?? null,
-            resolvedBookmakerId: null,
-            selectionMode: sgo.selectionMode,
-            source: sgo.source,
-            cacheLayer: sgo.cacheLayer,
-          },
-          { status: 200 },
-        );
-      }
-      return emptyOdds("SGO cache miss (sync quotidienne requise)");
-    }
-
-    if (home && away && THE_ODDS_API_KEY) {
-      const resolvedEvent = await resolveTheOddsEventId(home, away);
-      if (resolvedEvent?.eventId) {
-        let selectionMode: "requested" | "fallback" | "auto" = bookmaker
-          ? "requested"
-          : "auto";
-        let eventOdds = await fetchTheOddsEventOdds(resolvedEvent.eventId, bookmaker);
-        let selectedBook = pickTheOddsBookmaker(
-          eventOdds?.bookmakers ?? [],
+    if (home && away) {
+      const cachedTheOdds = await readTheOddsCachedEventForMatch(home, away);
+      if (cachedTheOdds) {
+        const builtFromCache = buildTheOddsResult(cachedTheOdds.event, {
+          fallbackHome: home,
+          fallbackAway: away,
           bookmaker,
-        );
-
-        // If requested bookmaker has no market for this event, retry without lock.
-        if (bookmaker && (!selectedBook || !hasTheOddsPlayerProps(selectedBook))) {
-          const fallbackOdds = await fetchTheOddsEventOdds(resolvedEvent.eventId, null);
-          if (fallbackOdds?.bookmakers?.length) {
-            eventOdds = fallbackOdds;
-            selectedBook = pickTheOddsBookmaker(fallbackOdds.bookmakers, null);
-            selectionMode = "fallback";
-          }
-        }
-
-        if (eventOdds && selectedBook) {
-          const availableBookmakers = getTheOddsAvailableBookmakers(
-            eventOdds.bookmakers ?? [],
-          );
-          const playerProps = extractPlayerPropsFromTheOddsBook(selectedBook);
-          const total = extractTotalFromTheOddsBook(selectedBook);
-          const spread = extractSpreadFromTheOddsBook(selectedBook, {
-            home_team: resolvedEvent.home,
-            away_team: resolvedEvent.away,
-          });
+        });
+        if (builtFromCache) {
           return NextResponse.json(
             {
               ok: true,
               game: game ? Number(game) : null,
-              bookmaker: {
-                id: null,
-                name: selectedBook.title ?? selectedBook.key ?? null,
-              },
-              availableBookmakers,
-              total,
-              spread,
-              playerProps,
+              bookmaker: builtFromCache.bookmaker,
+              availableBookmakers: builtFromCache.availableBookmakers,
+              total: builtFromCache.total,
+              openingTotal: builtFromCache.openingTotal,
+              spread: builtFromCache.spread,
+              openingSpread: builtFromCache.openingSpread,
+              moneyline: builtFromCache.moneyline,
+              playerProps: builtFromCache.playerProps,
               requestedBookmaker: bookmaker ?? null,
               resolvedBookmakerId: null,
-              selectionMode,
+              selectionMode: builtFromCache.selectionMode,
               source: "the-odds-api",
-              cacheLayer: "network",
+              cacheLayer: cachedTheOdds.cacheLayer,
             },
             { status: 200 },
           );
         }
       }
-    }
 
-    if (!game) {
-      return emptyOdds("match_not_found_for_home_away");
-    }
-    if (!API_KEY) {
-      return emptyOdds("apisports_key_missing");
-    }
+      if (cacheOnly) {
+        return emptyOdds("cache_only_no_daily_sync_data");
+      }
 
-    const firstFetch = await fetchOddsEnvelope(
-      game,
-      bookmaker && isNumericId(bookmaker) ? bookmaker : null,
-    );
-    if (!firstFetch.ok) {
-      return NextResponse.json(
-        {
-          error: "Upstream odds error",
-          status: firstFetch.status,
-          body: firstFetch.body,
-        },
-        { status: 502 },
-      );
-    }
+      if (THE_ODDS_API_KEY) {
+        const resolvedEvent = await resolveTheOddsEventId(home, away);
+        if (resolvedEvent?.eventId) {
+          let eventOdds = await fetchTheOddsEventOdds(resolvedEvent.eventId, bookmaker);
+          let built = eventOdds
+            ? buildTheOddsResult(eventOdds, {
+                fallbackHome: resolvedEvent.home,
+                fallbackAway: resolvedEvent.away,
+                bookmaker,
+              })
+            : null;
 
-    let workingPayload = firstFetch.payload;
-    let workingBookmakers = firstFetch.bookmakers;
-    let selectionMode: "auto" | "requested" | "resolved-id" | "fallback" =
-      bookmaker ? "requested" : "auto";
-    let resolvedBookmakerId: string | null = null;
-
-    let selected = bookmaker
-      ? pickBookmakerStrict(workingBookmakers, bookmaker)
-      : pickBookmaker(workingBookmakers, bookmaker);
-
-    // Name-based bookmaker selection can miss aliases upstream.
-    // Resolve bookmaker id and refetch /odds scoped by that id.
-    if (bookmaker && !selected && !isNumericId(bookmaker)) {
-      resolvedBookmakerId = await resolveBookmakerIdByName(bookmaker);
-      if (resolvedBookmakerId) {
-        const byIdFetch = await fetchOddsEnvelope(game, resolvedBookmakerId);
-        if (byIdFetch.ok) {
-          if (byIdFetch.bookmakers.length > 0) {
-            workingPayload = byIdFetch.payload;
-            workingBookmakers = byIdFetch.bookmakers;
+          // If requested bookmaker has no markets in the first call, refetch unscoped.
+          if (!built && bookmaker) {
+            eventOdds = await fetchTheOddsEventOdds(resolvedEvent.eventId, null);
+            built = eventOdds
+              ? buildTheOddsResult(eventOdds, {
+                  fallbackHome: resolvedEvent.home,
+                  fallbackAway: resolvedEvent.away,
+                  bookmaker,
+                })
+              : null;
           }
-          selected =
-            pickBookmakerStrict(byIdFetch.bookmakers, resolvedBookmakerId) ??
-            pickBookmakerStrict(byIdFetch.bookmakers, bookmaker);
-          if (selected && byIdFetch.bookmakers.length > 0) {
-            selectionMode = "resolved-id";
+
+          if (built) {
+            return NextResponse.json(
+              {
+                ok: true,
+                game: game ? Number(game) : null,
+                bookmaker: built.bookmaker,
+                availableBookmakers: built.availableBookmakers,
+                total: built.total,
+                openingTotal: built.openingTotal,
+                spread: built.spread,
+                openingSpread: built.openingSpread,
+                moneyline: built.moneyline,
+                playerProps: built.playerProps,
+                requestedBookmaker: bookmaker ?? null,
+                resolvedBookmakerId: null,
+                selectionMode: built.selectionMode,
+                source: "the-odds-api",
+                cacheLayer: "network",
+              },
+              { status: 200 },
+            );
           }
         }
       }
+
+      if (SGO_API_KEY) {
+        const sgo = await fetchSgoOddsForMatch(home, away, bookmaker);
+        if (sgo) {
+          return NextResponse.json(
+            {
+              ok: sgo.ok,
+              game: game ? Number(game) : null,
+              bookmaker: sgo.bookmaker,
+              availableBookmakers: sgo.availableBookmakers,
+              total: sgo.total,
+              openingTotal: sgo.openingTotal,
+              spread: sgo.spread,
+              openingSpread: sgo.openingSpread,
+              moneyline: sgo.moneyline,
+              playerProps: sgo.playerProps,
+              requestedBookmaker: bookmaker ?? null,
+              resolvedBookmakerId: null,
+              selectionMode: sgo.selectionMode,
+              source: sgo.source,
+              cacheLayer: sgo.cacheLayer,
+            },
+            { status: 200 },
+          );
+        }
+      }
+
+      return emptyOdds("odds_cache_miss_sync_required");
     }
 
-    // Keep odds visible if requested bookmaker has no active market.
-    if (bookmaker && !selected) {
-      selected = pickBookmaker(workingBookmakers, null);
-      if (selected) selectionMode = "fallback";
-    }
-
-    const bets = selected?.bets ?? [];
-    const total = extractTotal(bets);
-    const spread = extractSpread(bets);
-    const playerProps = bookmaker
-      ? extractPlayerProps(selected ? [selected] : [])
-      : extractPlayerProps(workingBookmakers);
-    const availableBookmakers = getApiSportsAvailableBookmakers(workingBookmakers);
-
-    return NextResponse.json(
-      {
-        ok: true,
-        game: Number(game),
-        bookmaker: selected
-          ? { id: selected.id ?? null, name: selected.name ?? null }
-          : null,
-        availableBookmakers,
-        total,
-        spread,
-        playerProps,
-        requestedBookmaker: bookmaker ?? null,
-        resolvedBookmakerId,
-        selectionMode,
-        errors: workingPayload.errors ?? null,
-        results: workingPayload.results ?? null,
-        source: "apisports",
-        cacheLayer: "network",
-      },
-      { status: 200 },
-    );
+    return emptyOdds("odds_cache_miss_sync_required");
   } catch (err) {
     return NextResponse.json(
       {

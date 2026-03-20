@@ -1,328 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Search, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowUpRight, Flame, Search, Sparkles, Trophy } from "lucide-react";
+import { TOP_PROPS_PAGE_SIZE, TEAM_CODE_BY_ID, getNbaCdnTeamLogo } from "@/lib/nba/constants";
+import {
+  formatPlayerName,
+  formatDecimal,
+  formatEdge,
+  formatOddsForDisplay,
+  gradeTone,
+  gradeSortRank,
+  getTeamPrimaryColor,
+  hexToRgba,
+  type OddsDisplayFormat,
+} from "@/app/nba/components/nba-helpers";
+import type {
+  BetalyzeNbaTeam,
+  BetalyzeNbaTeamsPayload,
+  NbaPlayer,
+  NbaTopProp,
+  NbaTopPropsApiPayload,
+  PlayersResponse,
+} from "@/app/nba/components/nba-shared-types";
 
-type NbaTeamMeta = {
-  id: number;
-  name: string;
-  fullName: string | null;
-  code: string | null;
-  logo: string | null;
-};
-
-type NbaPlayer = {
-  id: number;
-  fullName: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  teamId: number | null;
-  position: string | null;
-};
-
-type PlayersResponse = {
-  season: string;
-  updatedAt: string;
-  count: number;
-  players: NbaPlayer[];
-};
-
-type TeamsApiPayload = {
-  teams?: Array<{
-    id: number;
-    name?: string | null;
-    fullName?: string | null;
-    code?: string | null;
-    logo?: string | null;
-  }>;
-};
-
-type TopProp = {
-  playerId: number;
-  player: string;
-  teamId: number;
-  opponentId: number;
-  position: string | null;
-  metric: string;
-  side: "over" | "under";
-  line: number;
-  odds: number;
-  score: number;
-  grade: string;
-  edge: number;
-};
-
-const MOCK_TOP_PROPS: TopProp[] = [
-  {
-    playerId: 621,
-    player: "Nikola Jokic",
-    teamId: 139,
-    opponentId: 145,
-    position: "C",
-    metric: "pts",
-    side: "over",
-    line: 26.5,
-    odds: -115,
-    score: 93,
-    grade: "A",
-    edge: 0.09,
-  },
-  {
-    playerId: 526,
-    player: "Jayson Tatum",
-    teamId: 133,
-    opponentId: 151,
-    position: "F",
-    metric: "pts",
-    side: "over",
-    line: 29.5,
-    odds: -110,
-    score: 90,
-    grade: "A-",
-    edge: 0.06,
-  },
-  {
-    playerId: 661,
-    player: "Stephen Curry",
-    teamId: 141,
-    opponentId: 157,
-    position: "G",
-    metric: "3pm",
-    side: "over",
-    line: 4.5,
-    odds: -105,
-    score: 88,
-    grade: "B+",
-    edge: 0.05,
-  },
-  {
-    playerId: 807,
-    player: "Giannis Antetokounmpo",
-    teamId: 148,
-    opponentId: 154,
-    position: "F",
-    metric: "reb",
-    side: "over",
-    line: 11.5,
-    odds: -120,
-    score: 89,
-    grade: "A-",
-    edge: 0.07,
-  },
-  {
-    playerId: 612,
-    player: "Luka Doncic",
-    teamId: 138,
-    opponentId: 139,
-    position: "G",
-    metric: "pra",
-    side: "over",
-    line: 49.5,
-    odds: -110,
-    score: 92,
-    grade: "A",
-    edge: 0.08,
-  },
-  {
-    playerId: 878,
-    player: "Shai Gilgeous-Alexander",
-    teamId: 152,
-    opponentId: 140,
-    position: "G",
-    metric: "pts",
-    side: "over",
-    line: 30.5,
-    odds: -115,
-    score: 90,
-    grade: "A-",
-    edge: 0.06,
-  },
-  {
-    playerId: 820,
-    player: "Anthony Edwards",
-    teamId: 149,
-    opponentId: 155,
-    position: "G",
-    metric: "pts",
-    side: "over",
-    line: 28.5,
-    odds: -110,
-    score: 87,
-    grade: "B+",
-    edge: 0.04,
-  },
-  {
-    playerId: 910,
-    player: "Joel Embiid",
-    teamId: 154,
-    opponentId: 148,
-    position: "C",
-    metric: "pts",
-    side: "over",
-    line: 31.5,
-    odds: -115,
-    score: 91,
-    grade: "A",
-    edge: 0.07,
-  },
-  {
-    playerId: 747,
-    player: "LeBron James",
-    teamId: 145,
-    opponentId: 141,
-    position: "F",
-    metric: "ast",
-    side: "over",
-    line: 7.5,
-    odds: -105,
-    score: 86,
-    grade: "B",
-    edge: 0.03,
-  },
-  {
-    playerId: 932,
-    player: "Devin Booker",
-    teamId: 155,
-    opponentId: 149,
-    position: "G",
-    metric: "pts",
-    side: "over",
-    line: 27.5,
-    odds: -110,
-    score: 86,
-    grade: "B",
-    edge: 0.04,
-  },
-];
-
-const PROP_METRIC_LABELS: Record<string, string> = {
-  pts: "PTS",
-  reb: "REB",
-  ast: "AST",
-  pra: "PRA",
-  "3pm": "3PM",
-  blk: "BLK",
-  stl: "STL",
-};
-
-const TEAM_PRIMARY_BY_CODE: Record<string, string> = {
-  ATL: "#E03A3E",
-  BOS: "#007A33",
-  BKN: "#000000",
-  CHA: "#1D1160",
-  CHI: "#CE1141",
-  CLE: "#860038",
-  DAL: "#00538C",
-  DEN: "#0E2240",
-  DET: "#C8102E",
-  GSW: "#1D428A",
-  HOU: "#CE1141",
-  IND: "#002D62",
-  LAC: "#C8102E",
-  LAL: "#552583",
-  MEM: "#5D76A9",
-  MIA: "#98002E",
-  MIL: "#00471B",
-  MIN: "#0C2340",
-  NOP: "#0C2340",
-  NYK: "#006BB6",
-  OKC: "#007AC1",
-  ORL: "#0077C0",
-  PHI: "#006BB6",
-  PHX: "#1D1160",
-  POR: "#E03A3E",
-  SAC: "#5A2D81",
-  SAS: "#C4CED4",
-  TOR: "#CE1141",
-  UTA: "#002B5C",
-  WAS: "#002B5C",
-};
-
-const DEFAULT_PRIMARY = "#F59E0B";
 const MAX_SUGGESTIONS = 10;
-
-const hexToRgba = (hex: string, alpha: number) => {
-  const clean = hex.replace("#", "").trim();
-  if (clean.length !== 6) return `rgba(245, 158, 11, ${alpha})`;
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  if ([r, g, b].some((v) => Number.isNaN(v))) return `rgba(245, 158, 11, ${alpha})`;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-const getTeamPrimaryColor = (teamCode?: string | null) => {
-  const codeKey = teamCode?.toUpperCase();
-  if (codeKey && TEAM_PRIMARY_BY_CODE[codeKey]) return TEAM_PRIMARY_BY_CODE[codeKey];
-  return DEFAULT_PRIMARY;
-};
-
-const shuffleList = <T,>(items: T[]) => {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-};
-
-function formatPlayerName(player: NbaPlayer): string {
-  const fromParts = [player.firstName, player.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  if (fromParts) return fromParts;
-
-  const raw = player.fullName?.trim();
-  if (!raw) return `Player #${player.id}`;
-
-  const parts = raw.split(/\s+/);
-  if (parts.length >= 2) {
-    const first = parts.pop();
-    const last = parts.join(" ");
-    return `${first} ${last}`.trim();
-  }
-
-  return raw;
-}
-
-const formatDecimal = (value: number | null | undefined, digits = 2) => {
-  if (!Number.isFinite(value ?? NaN)) return "-";
-  return Number(value).toFixed(digits);
-};
-
-const formatEdge = (value: number | null | undefined) => {
-  if (!Number.isFinite(value ?? NaN)) return "-";
-  const num = Number(value) * 100;
-  return `${num >= 0 ? "+" : ""}${num.toFixed(1)}%`;
-};
-
-const formatOdds = (value: number | null | undefined) => {
-  if (!Number.isFinite(value ?? NaN)) return "-";
-  const num = Math.round(Number(value));
-  return num > 0 ? `+${num}` : `${num}`;
-};
-
-const metricLabel = (metric: string | null | undefined) => {
-  if (!metric) return "Metric";
-  return PROP_METRIC_LABELS[metric] ?? metric.toUpperCase();
-};
-
-const gradeTone = (grade: string | null | undefined) => {
-  if (!grade) return "bg-white/5 text-slate-200 ring-white/10";
-  if (grade.startsWith("A")) return "bg-emerald-500/15 text-emerald-200 ring-emerald-400/40";
-  if (grade.startsWith("B")) return "bg-sky-500/15 text-sky-200 ring-sky-400/40";
-  if (grade.startsWith("C")) return "bg-amber-500/15 text-amber-200 ring-amber-400/40";
-  if (grade.startsWith("D")) return "bg-rose-500/15 text-rose-200 ring-rose-400/40";
-  return "bg-rose-600/25 text-rose-100 ring-rose-400/40";
-};
 
 const cn = (...classes: Array<string | null | undefined | false>) =>
   classes.filter(Boolean).join(" ");
 
 export default function NbaPlayersPage() {
-  const [teams, setTeams] = useState<NbaTeamMeta[]>([]);
+  const [oddsFormat, setOddsFormat] = useState<OddsDisplayFormat>("decimal");
+  const [teams, setTeams] = useState<BetalyzeNbaTeam[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
   const [teamsError, setTeamsError] = useState<string | null>(null);
 
@@ -331,39 +40,77 @@ export default function NbaPlayersPage() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [playersError, setPlayersError] = useState<string | null>(null);
 
-  const [topProps, setTopProps] = useState<TopProp[]>(() => shuffleList(MOCK_TOP_PROPS));
-  const [topPropsMeta, setTopPropsMeta] = useState(() => ({
-    generatedAt: new Date().toISOString(),
-    source: "mock",
-  }));
+  const [topProps, setTopProps] = useState<NbaTopProp[]>([]);
+  const [topPropsLoading, setTopPropsLoading] = useState(false);
+  const [topPropsError, setTopPropsError] = useState<string | null>(null);
+  const [topPropsOu, setTopPropsOu] = useState<"ALL" | "OVER" | "UNDER">("ALL");
+  const [topPropsSortBy, setTopPropsSortBy] = useState<"GRADE" | "EDGE">("GRADE");
+  const [topPropsGameFilter, setTopPropsGameFilter] = useState<string>("ALL");
+  const [topPropsPage, setTopPropsPage] = useState(1);
+  const [topPropsGeneratedAt, setTopPropsGeneratedAt] = useState<string | null>(null);
+  const [topPropsDate, setTopPropsDate] = useState<string | null>(null);
+
+  // Leaderboard state
+  type LeaderboardEntry = {
+    playerId: number;
+    playerName: string;
+    teamCode: string;
+    position: string | null;
+    seasonAvg: number;
+    last5Avg: number | null;
+    gamesPlayed: number;
+    trend: "up" | "down" | "flat";
+  };
+  type RecentLog = { date: string; value: number; points: number; rebounds: number; assists: number };
+  type LeaderboardData = {
+    topScorers: LeaderboardEntry[];
+    topRebounders: LeaderboardEntry[];
+    topAssistmen: LeaderboardEntry[];
+    recentLogs: Array<{ playerId: number; metric: string; logs: RecentLog[] }>;
+    playingTeams: string[];
+  };
+  const [leaderboard, setLeaderboard] = useState<LeaderboardData | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [leaderboardTab, setLeaderboardTab] = useState<"PTS" | "REB" | "AST">("PTS");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/account/settings", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          ok?: boolean;
+          settings?: { oddsFormat?: string | null };
+        };
+        if (!data?.ok) return;
+        const next =
+          String(data.settings?.oddsFormat ?? "").toLowerCase() === "american"
+            ? "american"
+            : "decimal";
+        if (!cancelled) setOddsFormat(next);
+      } catch {
+        // keep default
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const loadTeams = async () => {
       try {
         setTeamsLoading(true);
         setTeamsError(null);
-        const res = await fetch("/api/nba/teams");
+        const res = await fetch("/api/nba/teams", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch NBA teams");
-        const data: TeamsApiPayload = await res.json();
-        const list: NbaTeamMeta[] = Array.isArray(data?.teams)
-          ? data.teams
-              .map((t) => {
-                const id = Number(t?.id);
-                if (!Number.isFinite(id)) return null;
-                return {
-                  id,
-                  name: t?.name ?? t?.fullName ?? "Team",
-                  fullName: t?.fullName ?? null,
-                  code: t?.code ?? null,
-                  logo: t?.logo ?? null,
-                };
-              })
-              .filter(Boolean)
-          : [];
-        setTeams(list);
+        const data = (await res.json()) as BetalyzeNbaTeamsPayload;
+        setTeams(Array.isArray(data.teams) ? data.teams : []);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        setTeamsError(message);
+        setTeams([]);
+        setTeamsError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setTeamsLoading(false);
       }
@@ -371,18 +118,95 @@ export default function NbaPlayersPage() {
     loadTeams();
   }, []);
 
+  const loadTopProps = useCallback(async (refresh: boolean) => {
+    try {
+      setTopPropsLoading(true);
+      setTopPropsError(null);
+      if (refresh) {
+        const syncUrl = new URL("/api/nba/odds/sync-daily", window.location.origin);
+        syncUrl.searchParams.set("refresh", "1");
+        syncUrl.searchParams.set("skipTopProps", "1");
+        syncUrl.searchParams.set("skipLogs", "1");
+        const syncRes = await fetch(syncUrl.toString(), { cache: "no-store" });
+        const syncJson = (await syncRes.json().catch(() => null)) as
+          | { ok?: boolean; error?: string; message?: string }
+          | null;
+        if (!syncRes.ok || syncJson?.ok === false) {
+          throw new Error(
+            syncJson?.error ??
+              syncJson?.message ??
+              `Failed to sync daily odds (${syncRes.status})`,
+          );
+        }
+      }
+      const url = new URL("/api/nba/props/top", window.location.origin);
+      if (refresh) url.searchParams.set("refresh", "1");
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch top props");
+      const data = (await res.json()) as NbaTopPropsApiPayload;
+      const list = Array.isArray(data?.props) ? data.props : [];
+      const normalized: NbaTopProp[] = list
+        .map((item) => ({
+          id: String(item.id),
+          playerId: item.playerId ?? null,
+          player: String(item.player ?? "Player"),
+          metric: String(item.metric ?? "PTS"),
+          line: Number(item.line),
+          side: item.side === "under" ? ("under" as const) : ("over" as const),
+          odds: Number(item.odds),
+          edge: Number(item.edge),
+          score: Number(item.score),
+          grade: String(item.grade ?? "C"),
+          finalScore: Number(item.finalScore ?? item.score ?? 0),
+          gameId: item.gameId ?? null,
+          awayCode: String(item.teamCode ?? "").trim().toUpperCase() || "—",
+          homeCode: String(item.opponentCode ?? "").trim().toUpperCase() || "—",
+          bookmaker: item.bookmaker ?? null,
+        }))
+        .filter((item) => Number.isFinite(item.line) && Number.isFinite(item.odds));
+      setTopProps(normalized);
+      setTopPropsGeneratedAt(typeof data.generatedAt === "string" ? data.generatedAt : null);
+      setTopPropsDate(typeof data.date === "string" ? data.date : null);
+    } catch (err) {
+      setTopProps([]);
+      setTopPropsError(err instanceof Error ? err.message : "Unknown error");
+      setTopPropsGeneratedAt(null);
+      setTopPropsDate(null);
+    } finally {
+      setTopPropsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTopProps(false);
+  }, [loadTopProps]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLeaderboardLoading(true);
+        const res = await fetch("/api/nba/players/leaderboard", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json() as LeaderboardData & { ok: boolean };
+        if (data.ok) setLeaderboard(data);
+      } catch {
+        // silent
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
   useEffect(() => {
     const query = search.trim();
-
     if (query.length < 2) {
       setPlayers([]);
       setPlayersError(null);
       setPlayersLoading(false);
       return;
     }
-
     const controller = new AbortController();
-
     const fetchPlayers = async () => {
       try {
         setPlayersLoading(true);
@@ -391,64 +215,143 @@ export default function NbaPlayersPage() {
         const res = await fetch(`/api/nba/players?${params.toString()}`, {
           signal: controller.signal,
         });
-        if (!res.ok) {
-          throw new Error("Failed to fetch players");
-        }
-        const data: PlayersResponse = await res.json();
-        const list = Array.isArray(data?.players) ? data.players : [];
+        if (!res.ok) throw new Error("Failed to fetch players");
+        const data = (await res.json()) as PlayersResponse;
+        const list = Array.isArray(data.players) ? data.players : [];
         const seen = new Set<number>();
         const unique = list.filter((p) => {
-          const id = Number(p.id);
-          if (!Number.isFinite(id)) return false;
-          if (seen.has(id)) return false;
+          const id = Number(p.id ?? NaN);
+          if (!Number.isFinite(id) || seen.has(id)) return false;
           seen.add(id);
           return true;
         });
         setPlayers(unique.slice(0, MAX_SUGGESTIONS));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        const message = err instanceof Error ? err.message : "Unknown error";
-        setPlayersError(message);
+        setPlayersError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setPlayersLoading(false);
       }
     };
-
     const timeout = setTimeout(fetchPlayers, 250);
-
     return () => {
       clearTimeout(timeout);
       controller.abort();
     };
   }, [search]);
 
-  const teamMetaById = useMemo(() => {
-    const map = new Map<number, NbaTeamMeta>();
+  const teamMetaByCode = useMemo(() => {
+    const map = new Map<string, BetalyzeNbaTeam>();
     teams.forEach((team) => {
-      map.set(team.id, team);
+      const code = String(team.code ?? "").trim().toUpperCase();
+      if (code) map.set(code, team);
     });
     return map;
   }, [teams]);
 
   const suggestions = useMemo(() => {
     if (search.trim().length < 2) return [];
-    return players.slice(0, MAX_SUGGESTIONS).map((player) => {
-      const teamId = player.teamId ?? null;
-      const team = teamId ? teamMetaById.get(Number(teamId)) : undefined;
+    return players.map((player) => {
+      const code =
+        String(player.teamCode ?? "").trim().toUpperCase() ||
+        (player.teamId ? String(TEAM_CODE_BY_ID[Number(player.teamId)] ?? "").trim().toUpperCase() : "");
+      const team = code ? (teamMetaByCode.get(code) ?? null) : null;
       return {
         id: String(player.id),
         label: formatPlayerName(player),
+        firstName: player.firstName ?? null,
+        lastName: player.lastName ?? null,
         position: player.position ?? "-",
-        teamLabel: team?.code ?? team?.name ?? "NBA",
-        teamLogo: team?.logo ?? null,
+        jerseyNumber: player.jerseyNumber ?? null,
+        teamLabel: code || team?.code || team?.name || "NBA",
+        teamLogo: getNbaCdnTeamLogo(code) ?? team?.logo ?? null,
       };
     });
-  }, [players, search, teamMetaById]);
+  }, [players, search, teamMetaByCode]);
 
-  const refreshMock = () => {
-    setTopProps(shuffleList(MOCK_TOP_PROPS));
-    setTopPropsMeta({ generatedAt: new Date().toISOString(), source: "mock" });
-  };
+  const topPropsGameOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [
+      { value: "ALL", label: "Tous les games" },
+    ];
+    const seen = new Set<string>();
+    for (const item of topProps) {
+      const gameId = Number(item.gameId ?? NaN);
+      if (!Number.isFinite(gameId)) continue;
+      const key = String(gameId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      options.push({
+        value: key,
+        label: `${String(item.awayCode || "AWAY").toUpperCase()} vs ${String(item.homeCode || "HOME").toUpperCase()}`,
+      });
+    }
+    return options;
+  }, [topProps]);
+
+  useEffect(() => {
+    if (topPropsGameFilter === "ALL") return;
+    if (!topPropsGameOptions.some((option) => option.value === topPropsGameFilter)) {
+      setTopPropsGameFilter("ALL");
+    }
+  }, [topPropsGameFilter, topPropsGameOptions]);
+
+  const topPropsDisplay = useMemo(() => {
+    const selectedGameId = topPropsGameFilter === "ALL" ? NaN : Number(topPropsGameFilter);
+    const hasGameFilter = Number.isFinite(selectedGameId) && selectedGameId > 0;
+    const filtered = topProps.filter((item) => {
+      if (hasGameFilter && Number(item.gameId ?? NaN) !== selectedGameId) return false;
+      if (topPropsOu === "OVER") return item.side === "over";
+      if (topPropsOu === "UNDER") return item.side === "under";
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      if (topPropsSortBy === "EDGE") return b.edge - a.edge;
+      const gradeDiff = gradeSortRank(b.grade) - gradeSortRank(a.grade);
+      if (gradeDiff !== 0) return gradeDiff;
+      if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
+      return b.edge - a.edge;
+    });
+  }, [topProps, topPropsGameFilter, topPropsOu, topPropsSortBy]);
+
+  const topPropsPageCount = useMemo(
+    () => Math.max(1, Math.ceil(topPropsDisplay.length / TOP_PROPS_PAGE_SIZE)),
+    [topPropsDisplay.length],
+  );
+
+  useEffect(() => {
+    setTopPropsPage(1);
+  }, [topPropsGameFilter, topPropsOu, topPropsSortBy]);
+
+  useEffect(() => {
+    if (topPropsPage > topPropsPageCount) setTopPropsPage(topPropsPageCount);
+  }, [topPropsPage, topPropsPageCount]);
+
+  const topPropsPagedDisplay = useMemo(() => {
+    const start = (topPropsPage - 1) * TOP_PROPS_PAGE_SIZE;
+    return topPropsDisplay.slice(start, start + TOP_PROPS_PAGE_SIZE);
+  }, [topPropsDisplay, topPropsPage]);
+
+  // Hit Rate: top 8 props by score, with hit rate derived from grade
+  const hitRateProps = useMemo(() => {
+    const gradeToHitRate: Record<string, number> = {
+      "A+": 87, A: 79, "B+": 73, B: 66, "C+": 60, C: 54,
+    };
+    return [...topPropsDisplay]
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, 8)
+      .map((p) => ({
+        ...p,
+        hitRate: gradeToHitRate[p.grade] ?? 55,
+      }));
+  }, [topPropsDisplay]);
+
+  // Leaderboard entries for current tab
+  const leaderboardEntries = useMemo(() => {
+    if (!leaderboard) return [];
+    if (leaderboardTab === "PTS") return leaderboard.topScorers;
+    if (leaderboardTab === "REB") return leaderboard.topRebounders;
+    return leaderboard.topAssistmen;
+  }, [leaderboard, leaderboardTab]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07070b] px-4 pb-10 pt-6 text-slate-100">
@@ -457,17 +360,19 @@ export default function NbaPlayersPage() {
         <div className="absolute -bottom-56 -left-44 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.14),transparent_65%)] blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex max-w-5xl flex-col gap-6">
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-50">NBA Players / Props</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-50">
+              NBA Players / Best Props
+            </h1>
             <p className="text-sm text-slate-400/90">
-              Focus joueurs NBA. Props en mock pour le moment.
+              Top opportunites joueurs du jour, avec snapshot quotidien.
             </p>
           </div>
           <button
             type="button"
-            onClick={refreshMock}
+            onClick={() => void loadTopProps(true)}
             className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300 transition hover:border-amber-400/60 hover:bg-amber-500/10 hover:text-amber-200"
           >
             Rafraichir
@@ -475,6 +380,180 @@ export default function NbaPlayersPage() {
           </button>
         </div>
 
+        {/* ── Top ce soir ── */}
+        <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/15 ring-1 ring-amber-400/50">
+                <Trophy className="h-4 w-4 text-amber-200" />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-100">Top ce soir</p>
+                <p className="text-xs text-slate-500">
+                  {leaderboard?.playingTeams?.length
+                    ? `${leaderboard.playingTeams.length} équipes en jeu`
+                    : "Joueurs qui jouent ce soir"}
+                </p>
+              </div>
+            </div>
+            <div className="inline-flex overflow-hidden rounded-full border border-white/10 bg-black/25 text-[11px]">
+              {(["PTS", "REB", "AST"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setLeaderboardTab(tab)}
+                  className={cn(
+                    "px-3 py-1 transition font-semibold",
+                    leaderboardTab === tab
+                      ? "bg-amber-500/15 text-amber-300"
+                      : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                  )}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {leaderboardLoading && (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
+                ))}
+              </div>
+            )}
+            {!leaderboardLoading && leaderboardEntries.length === 0 && (
+              <div className="rounded-xl border border-white/10 bg-black/20 py-10 text-center text-[12px] text-white/30">
+                Aucun match ce soir ou données insuffisantes.
+              </div>
+            )}
+            {leaderboardEntries.map((entry, index) => {
+              const rankColors = [
+                { num: "text-amber-300", bg: "bg-amber-500/15", ring: "ring-amber-500/30" },
+                { num: "text-slate-300", bg: "bg-white/[0.07]", ring: "ring-white/10" },
+                { num: "text-amber-700", bg: "bg-amber-900/20", ring: "ring-amber-800/20" },
+                { num: "text-white/30", bg: "bg-white/[0.04]", ring: "ring-white/5" },
+                { num: "text-white/30", bg: "bg-white/[0.04]", ring: "ring-white/5" },
+              ];
+              const rank = rankColors[index] ?? rankColors[4];
+              const statLabel = leaderboardTab === "PTS" ? "pts" : leaderboardTab === "REB" ? "reb" : "ast";
+              const isUp = entry.trend === "up";
+              const isDown = entry.trend === "down";
+              return (
+                <div
+                  key={entry.playerId}
+                  className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-black/25 px-4 py-3 transition hover:border-white/10 hover:bg-black/35"
+                >
+                  <span className={cn("flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-black ring-1", rank.bg, rank.ring, rank.num)}>
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-[13px] font-semibold text-slate-100">{entry.playerName}</p>
+                      {entry.position && (
+                        <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white/40">
+                          {entry.position}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">{entry.teamCode} · {entry.gamesPlayed} matchs</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-right">
+                    {entry.last5Avg !== null && (
+                      <div className="hidden flex-col items-end sm:flex">
+                        <span className={cn("text-[10px] font-semibold", isUp ? "text-emerald-400" : isDown ? "text-rose-400" : "text-white/30")}>
+                          {isUp ? "▲" : isDown ? "▼" : "—"} L5: {formatDecimal(entry.last5Avg, 1)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline gap-0.5">
+                      <span className={cn("text-[22px] font-black tabular-nums leading-none", index === 0 ? "text-amber-300" : "text-white/80")}>
+                        {formatDecimal(entry.seasonAvg, 1)}
+                      </span>
+                      <span className="text-[10px] text-white/30">{statLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Hit Rate Leaders ── */}
+        {hitRateProps.length > 0 && (
+          <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/15 ring-1 ring-rose-500/30">
+                <Flame className="h-4 w-4 text-rose-300" />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-100">Hit Rate Leaders</p>
+                <p className="text-xs text-slate-500">Props avec le meilleur taux de réussite estimé ce soir</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              {hitRateProps.map((prop) => {
+                const team = teamMetaByCode.get(String(prop.awayCode ?? "").toUpperCase());
+                const sideLabel = prop.side === "over" ? "O" : "U";
+                const hitRate = prop.hitRate;
+                const hitColor =
+                  hitRate >= 80 ? "text-emerald-400" :
+                  hitRate >= 70 ? "text-amber-400" :
+                  hitRate >= 60 ? "text-orange-400" :
+                  "text-white/40";
+                const barColor =
+                  hitRate >= 80 ? "bg-emerald-500" :
+                  hitRate >= 70 ? "bg-amber-500" :
+                  hitRate >= 60 ? "bg-orange-500" :
+                  "bg-white/20";
+                const playerHref = prop.playerId ? `/nba/players/${prop.playerId}` : null;
+                return (
+                  <div key={prop.id} className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-black/20 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {playerHref ? (
+                          <Link href={playerHref} className="text-[13px] font-semibold text-slate-100 hover:text-amber-200">
+                            {prop.player}
+                          </Link>
+                        ) : (
+                          <span className="text-[13px] font-semibold text-slate-100">{prop.player}</span>
+                        )}
+                        <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[10px] text-slate-400">
+                          {String(prop.metric).toUpperCase()} {sideLabel} {formatDecimal(prop.line, 1)}
+                        </span>
+                        {team?.code && (
+                          <span className="text-[10px] text-slate-600">{team.code}</span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]">
+                          <div
+                            className={cn("h-full rounded-full transition-all", barColor)}
+                            style={{ width: `${hitRate}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className={cn("text-[18px] font-black tabular-nums leading-none", hitColor)}>
+                        {hitRate}%
+                      </span>
+                      <span className="text-[9px] text-white/30 uppercase tracking-wide">hit rate</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="mt-3 text-[10px] text-slate-600">
+              * Hit rate estimé à partir du grade Betalyze — basé sur edge, forme récente et matchup.
+            </p>
+          </section>
+        )}
+
+        {/* ── Recherche joueur ── */}
         <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex items-start gap-2">
@@ -490,12 +569,8 @@ export default function NbaPlayersPage() {
                 </p>
               </div>
             </div>
-            {playersLoading && (
-              <span className="text-[10px] text-slate-500">Chargement joueurs...</span>
-            )}
-            {playersError && (
-              <span className="text-[10px] text-rose-300">{playersError}</span>
-            )}
+            {playersLoading && <span className="text-[10px] text-slate-500">Chargement joueurs...</span>}
+            {playersError && <span className="text-[10px] text-rose-300">{playersError}</span>}
           </div>
 
           <div className="mt-4">
@@ -509,63 +584,52 @@ export default function NbaPlayersPage() {
 
           {suggestions.length > 0 && (
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {suggestions.map((item) => {
-                const teamPrimary = getTeamPrimaryColor(item.teamLabel);
-                const softGlow = hexToRgba(teamPrimary, 0.2);
-                const midGlow = hexToRgba(teamPrimary, 0.12);
-                const lineGlow = hexToRgba(teamPrimary, 0.45);
-                return (
-                  <Link
-                    key={item.id}
-                    href={`/nba/players/${item.id}`}
-                    className="group relative flex items-center justify-between overflow-hidden rounded-2xl border px-3 py-2 text-left text-[12px] transition hover:-translate-y-0.5 hover:border-amber-300/70"
-                    style={{
-                      backgroundImage: `linear-gradient(130deg, ${softGlow} 0%, ${midGlow} 42%, rgba(3,3,7,0.8) 100%)`,
-                      borderColor: lineGlow,
-                      boxShadow: `inset 0 1px 0 ${hexToRgba(teamPrimary, 0.5)}`,
-                    }}
-                  >
-                    <div
-                      className="pointer-events-none absolute inset-y-0 left-0 w-20 opacity-60"
-                      style={{
-                        background: `linear-gradient(90deg, ${hexToRgba(teamPrimary, 0.3)} 0%, rgba(0,0,0,0) 100%)`,
-                      }}
-                    />
-                    <div className="relative z-10 flex min-w-0 items-center gap-2">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[10px] font-semibold text-slate-300 ring-1 ring-white/10">
-                        {item.teamLogo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.teamLogo}
-                            alt={item.teamLabel}
-                            className="h-6 w-6 object-contain"
-                          />
-                        ) : (
-                          item.teamLabel.slice(0, 3).toUpperCase()
+              {suggestions.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/nba/players/${item.id}`}
+                  className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-left text-[12px] transition hover:-translate-y-0.5 hover:border-amber-300/70"
+                >
+                  <div className="relative z-10 flex min-w-0 items-center gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[10px] font-semibold text-slate-300 ring-1 ring-white/10">
+                      {
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src="/images/avatar-player.svg" alt="" className="h-6 w-6 object-contain opacity-85" />
+                      }
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] text-slate-50">
+                        {item.firstName && (
+                          <span className="font-normal">{item.firstName} </span>
                         )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-50">{item.label}</p>
-                        <p className="text-[10px] text-slate-400">
-                          {item.position} / {item.teamLabel}
-                        </p>
+                        {item.lastName && (
+                          <span className="font-bold tracking-wide">{item.lastName.toUpperCase()}</span>
+                        )}
+                        {!item.firstName && !item.lastName && item.label}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {item.position && item.position !== "-" && (
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-white/[0.06] text-slate-400 ring-1 ring-white/[0.08]">
+                            {item.position}
+                          </span>
+                        )}
+                        {item.jerseyNumber && (
+                          <span className="text-[11px] text-slate-500">#{item.jerseyNumber}</span>
+                        )}
+                        <span className="text-white/15">·</span>
+                        {item.teamLogo && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.teamLogo} alt={item.teamLabel} className="h-3.5 w-3.5 object-contain opacity-85" />
+                        )}
+                        <span className="text-[11px] font-semibold text-slate-400">{item.teamLabel}</span>
                       </div>
                     </div>
-                    <ArrowUpRight className="relative z-10 h-4 w-4 text-slate-500 transition group-hover:text-amber-200" />
-                  </Link>
-                );
-              })}
+                  </div>
+                  <ArrowUpRight className="relative z-10 h-4 w-4 text-slate-500 transition group-hover:text-amber-200" />
+                </Link>
+              ))}
             </div>
           )}
-
-          {!playersLoading &&
-            search.trim().length >= 2 &&
-            suggestions.length === 0 &&
-            !playersError && (
-              <p className="mt-3 text-xs text-slate-500">
-                Aucun resultat pour &quot;{search.trim()}&quot;.
-              </p>
-            )}
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
@@ -576,33 +640,89 @@ export default function NbaPlayersPage() {
               </div>
               <div>
                 <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-100">
-                  Best props (mock)
+                  Best props du jour
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Top 10 props NBA en mock. Les odds resteront fictives.
+                  Snapshot quotidien des meilleures opportunites joueurs.
                 </p>
-                {topPropsMeta.generatedAt && (
+                {topPropsGeneratedAt && (
                   <p className="mt-2 text-[10px] text-slate-500">
-                    Maj: {new Date(topPropsMeta.generatedAt).toLocaleString("fr-CA")} / {topPropsMeta.source}
+                    Maj: {new Date(topPropsGeneratedAt).toLocaleString("fr-CA")}
+                    {topPropsDate ? ` / Date: ${topPropsDate}` : ""}
                   </p>
                 )}
               </div>
             </div>
-            {teamsLoading && (
-              <span className="text-[10px] text-slate-500">Chargement equipes...</span>
-            )}
-            {teamsError && (
-              <span className="text-[10px] text-rose-300">{teamsError}</span>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={topPropsGameFilter}
+                onChange={(event) => setTopPropsGameFilter(event.target.value)}
+                className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] text-slate-200 outline-none"
+              >
+                {topPropsGameOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-[#0b0f18] text-white">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="inline-flex overflow-hidden rounded-full border border-white/10 bg-black/25 text-[11px]">
+                {(["ALL", "OVER", "UNDER"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setTopPropsOu(item)}
+                    className={cn(
+                      "px-3 py-1 transition",
+                      topPropsOu === item
+                        ? "bg-white/10 text-white"
+                        : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                    )}
+                  >
+                    {item === "ALL" ? "Tous" : item === "OVER" ? "Over" : "Under"}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex overflow-hidden rounded-full border border-white/10 bg-black/25 text-[11px]">
+                {(["GRADE", "EDGE"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setTopPropsSortBy(item)}
+                    className={cn(
+                      "px-3 py-1 transition",
+                      topPropsSortBy === item
+                        ? "bg-white/10 text-white"
+                        : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                    )}
+                  >
+                    {item === "GRADE" ? "Note" : "Edge"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
+          {teamsLoading && <p className="mt-3 text-[10px] text-slate-500">Chargement equipes...</p>}
+          {teamsError && <p className="mt-3 text-[10px] text-rose-300">{teamsError}</p>}
+          {topPropsError && <p className="mt-3 text-[10px] text-rose-300">{topPropsError}</p>}
+
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {topProps.map((prop) => {
-              const team = teamMetaById.get(prop.teamId);
-              const opp = teamMetaById.get(prop.opponentId);
-              const teamLabel = team?.code ?? team?.name ?? "Team";
-              const oppLabel = opp?.code ?? opp?.name ?? "Opp";
-              const posLabel = prop.position ?? "POS";
+            {topPropsLoading && (
+              <p className="col-span-full text-[11px] text-slate-500">Chargement des props...</p>
+            )}
+            {!topPropsLoading && topPropsDisplay.length === 0 && (
+              <div className="col-span-full rounded-xl border border-white/10 bg-black/20 py-16 text-center text-white/50">
+                Aucune prop disponible actuellement.
+              </div>
+            )}
+
+            {topPropsPagedDisplay.map((prop) => {
+              const team = teamMetaByCode.get(String(prop.awayCode ?? "").toUpperCase());
+              const opp = teamMetaByCode.get(String(prop.homeCode ?? "").toUpperCase());
+              const teamLabel =
+                team?.code ?? team?.name ?? (prop.awayCode && prop.awayCode !== "—" ? prop.awayCode : "—");
+              const oppLabel =
+                opp?.code ?? opp?.name ?? (prop.homeCode && prop.homeCode !== "—" ? prop.homeCode : "—");
               const sideLabel = prop.side === "over" ? "O" : "U";
               const primary = getTeamPrimaryColor(team?.code ?? teamLabel);
               const primarySoft = hexToRgba(primary, 0.22);
@@ -611,9 +731,10 @@ export default function NbaPlayersPage() {
               const oppPrimary = getTeamPrimaryColor(opp?.code ?? oppLabel);
               const oppChipBg = hexToRgba(oppPrimary, 0.18);
               const oppChipRing = hexToRgba(oppPrimary, 0.28);
+              const playerHref = prop.playerId ? `/nba/players/${prop.playerId}` : null;
               return (
                 <div
-                  key={`${prop.playerId}-${prop.metric}-${prop.side}`}
+                  key={prop.id}
                   className="group relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border px-4 py-3 transition hover:-translate-y-0.5"
                   style={{
                     backgroundImage: `linear-gradient(130deg, ${primarySoft} 0%, ${primaryMid} 42%, rgba(3, 3, 7, 0.85) 100%)`,
@@ -624,38 +745,29 @@ export default function NbaPlayersPage() {
                   <div
                     className="absolute inset-y-0 left-0 w-20 opacity-50"
                     style={{
-                      background: `linear-gradient(90deg, ${hexToRgba(
-                        primary,
-                        0.35,
-                      )} 0%, rgba(0,0,0,0) 100%)`,
+                      background: `linear-gradient(90deg, ${hexToRgba(primary, 0.35)} 0%, rgba(0,0,0,0) 100%)`,
                     }}
                   />
                   <div className="relative z-10 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/nba/players/${prop.playerId}`}
-                        className="truncate text-[13px] font-semibold text-slate-100 hover:text-amber-200"
-                      >
-                        {prop.player}
-                      </Link>
+                      {playerHref ? (
+                        <Link href={playerHref} className="truncate text-[13px] font-semibold text-slate-100 hover:text-amber-200">
+                          {prop.player}
+                        </Link>
+                      ) : (
+                        <p className="truncate text-[13px] font-semibold text-slate-100">{prop.player}</p>
+                      )}
                       <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[11px] text-slate-400 ring-1 ring-white/10">
-                        {posLabel} / {teamLabel}
+                        NBA / {teamLabel}
                         {team?.logo && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={team.logo}
-                            alt={team?.name ?? teamLabel}
-                            className="h-4 w-4 object-contain"
-                          />
+                          <img src={team.logo} alt={team?.name ?? teamLabel} className="h-4 w-4 object-contain" />
                         )}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.2em] text-slate-300">
-                        Mock
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-300/90">
-                      vs {oppLabel} / {metricLabel(prop.metric)} {sideLabel}{" "}
-                      {formatDecimal(prop.line, 1)} @ {formatOdds(prop.odds)}
+                      vs {oppLabel} / {String(prop.metric ?? "").toUpperCase()} {sideLabel}{" "}
+                      {formatDecimal(prop.line, 1)} @ {formatOddsForDisplay(prop.odds, oddsFormat)}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
                       <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5">
@@ -670,11 +782,7 @@ export default function NbaPlayersPage() {
                       >
                         {opp?.logo && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={opp.logo}
-                            alt={opp?.name ?? oppLabel}
-                            className="h-3.5 w-3.5 object-contain"
-                          />
+                          <img src={opp.logo} alt={opp?.name ?? oppLabel} className="h-3.5 w-3.5 object-contain" />
                         )}
                         Opp {oppLabel}
                       </span>
@@ -692,6 +800,32 @@ export default function NbaPlayersPage() {
               );
             })}
           </div>
+
+          {topPropsDisplay.length > TOP_PROPS_PAGE_SIZE && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-[11px] text-slate-500">
+                Page {topPropsPage}/{topPropsPageCount} / {topPropsDisplay.length} props
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTopPropsPage((prev) => Math.max(1, prev - 1))}
+                  className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] text-slate-300 transition hover:border-white/20 hover:text-white"
+                  disabled={topPropsPage <= 1}
+                >
+                  Precedent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTopPropsPage((prev) => Math.min(topPropsPageCount, prev + 1))}
+                  className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] text-slate-300 transition hover:border-white/20 hover:text-white"
+                  disabled={topPropsPage >= topPropsPageCount}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </div>

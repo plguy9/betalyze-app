@@ -2,15 +2,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.APISPORTS_BASKETBALL_URL ||
-  process.env.APISPORTS_NBA_URL ||
-  "https://v1.basketball.api-sports.io";
+  process.env.APISPORTS_NBA_URL || "https://v2.nba.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const DEFAULT_SEASON =
-  process.env.APISPORTS_BASKETBALL_SEASON ||
-  process.env.APISPORTS_NBA_SEASON ||
-  "2025-2026";
-const IS_BASKETBALL_V1 = API_BASE.includes("basketball");
+  process.env.APISPORTS_NBA_SEASON || "2025";
 
 // Correspondance codes -> IDs NBA v2 (https://v2.nba.api-sports.io)
 const V2_TEAM_ID_BY_CODE: Record<string, number> = {
@@ -87,7 +82,6 @@ function resolveV2TeamId(teamId: number) {
 }
 
 function resolveTeamIdForApi(teamId: number) {
-  if (IS_BASKETBALL_V1) return teamId;
   return resolveV2TeamId(teamId);
 }
 
@@ -96,7 +90,7 @@ function normalizeSeason(value: string): string {
   if (!match) return value;
   const year = Number(match[1]);
   if (!Number.isFinite(year)) return value;
-  return IS_BASKETBALL_V1 ? `${year}-${year + 1}` : String(year);
+  return String(year);
 }
 
 function pointsFromGame(game: any, teamId: number | null | undefined): number | null {
@@ -167,14 +161,9 @@ function calcPoss(s: GameStatsLine): number | null {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params?: { id?: string | string[] } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  // fallback: parse depuis l'URL si params est vide
-  const rawIdParam = Array.isArray(params?.id) ? params?.id[0] : params?.id;
-  const segments = req.nextUrl.pathname.split("/").filter(Boolean);
-  const idx = segments.findIndex((s) => s === "teams");
-  const rawIdPath = idx >= 0 ? segments[idx + 1] : null;
-  const rawId = rawIdParam ?? rawIdPath;
+  const { id: rawId } = await params;
 
   const teamId = Number(rawId);
   if (!Number.isFinite(teamId)) {
@@ -247,10 +236,7 @@ export async function GET(
     for (const g of finished) {
       const gameId = g?.id;
       if (!gameId) continue;
-      const statsUrl = new URL(
-        IS_BASKETBALL_V1 ? "/games/statistics/teams" : "/games/statistics",
-        API_BASE,
-      );
+      const statsUrl = new URL("/games/statistics", API_BASE);
       statsUrl.searchParams.set("id", String(gameId));
       const statsRes = await fetch(statsUrl.toString(), {
         headers: { "x-apisports-key": API_KEY },
@@ -269,18 +255,15 @@ export async function GET(
       const oppStats = normalizeStatsLine(oppEntry ?? null) ?? undefined;
       const myPoss = myStats ? calcPoss(myStats) : null;
       const oppPoss = oppStats ? calcPoss(oppStats) : null;
-      const myPts =
-        myStats?.points ?? (IS_BASKETBALL_V1 ? pointsFromGame(g, teamIdForApi) : null);
+      const myPts = myStats?.points ?? pointsFromGame(g, teamIdForApi);
       const oppPts =
         oppStats?.points ??
-        (IS_BASKETBALL_V1
-          ? pointsFromGame(
-              g,
-              String(teamIdForApi) === String(g?.teams?.home?.id)
-                ? g?.teams?.away?.id
-                : g?.teams?.home?.id,
-            )
-          : null);
+        pointsFromGame(
+          g,
+          String(teamIdForApi) === String(g?.teams?.home?.id)
+            ? g?.teams?.away?.id
+            : g?.teams?.home?.id,
+        );
 
       if (
         myPoss !== null &&

@@ -3,26 +3,24 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import {
-  nbaSeasonAliases,
-  normalizeNbaSeasonLabel,
+  pruneNbaPlayersForSeason,
   upsertNbaPlayersForSeason,
   type NbaPlayerRecord,
 } from "@/lib/nba/players-db";
 
 const API_BASE =
-  process.env.APISPORTS_BASKETBALL_URL ||
-  process.env.APISPORTS_NBA_URL ||
-  "https://v1.basketball.api-sports.io";
+  process.env.APISPORTS_NBA_URL || "https://v2.nba.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const RAW_SEASON =
-  process.env.APISPORTS_BASKETBALL_SEASON ||
-  process.env.APISPORTS_NBA_SEASON ||
-  "2025-2026";
-const LEAGUE =
-  process.env.APISPORTS_BASKETBALL_LEAGUE_ID ||
-  process.env.APISPORTS_NBA_LEAGUE_ID ||
-  "12";
-const IS_BASKETBALL_V1 = API_BASE.includes("basketball");
+  process.env.APISPORTS_NBA_SEASON || "2025";
+const LEAGUE = (() => {
+  const raw = String(process.env.APISPORTS_NBA_LEAGUE_ID ?? "standard")
+    .trim()
+    .toLowerCase();
+  if (!raw || raw === "nba" || raw === "12") return "standard";
+  return raw;
+})();
+const MIN_SAFE_PLAYERS_FOR_PRUNE = 350;
 
 // l'API NBA v2 attend un entier (ex: 2025 pour la saison 2025-2026)
 function seasonInt(value: string): string {
@@ -56,6 +54,13 @@ type CollectedApiPlayer = ApiPlayer & {
   _teamNameHint?: string | null;
 };
 
+function positiveIntOrNull(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const t = Math.trunc(n);
+  return t > 0 ? t : null;
+}
+
 export async function GET() {
   if (!API_BASE || !API_KEY) {
     return NextResponse.json(
@@ -64,7 +69,17 @@ export async function GET() {
     );
   }
 
-  const season = IS_BASKETBALL_V1 ? normalizeNbaSeasonLabel(RAW_SEASON) : seasonInt(RAW_SEASON);
+  if (API_BASE.includes("basketball")) {
+    return NextResponse.json(
+      {
+        error:
+          "APISPORTS_NBA_URL must point to NBA v2 (v2.nba.api-sports.io). Basketball v1 fallback is disabled.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const season = seasonInt(RAW_SEASON);
   const collected: CollectedApiPlayer[] = [];
   const attempts: Array<{
     team?: number;
@@ -77,51 +92,60 @@ export async function GET() {
 
   try {
     // 1) Récupérer la liste des équipes NBA v2 pour la saison
-    // Essayer plusieurs variantes pour lister les équipes (sans league)
-    const teamSeasonCandidates = IS_BASKETBALL_V1
-      ? nbaSeasonAliases(RAW_SEASON)
-      : [season];
+    const teamSeasonCandidates = [season];
     let teamIds: number[] = [];
     const teamNameById = new Map<number, string>();
     let resolvedSeasonForTeams = season;
     for (const teamSeason of teamSeasonCandidates) {
-      const teamUrl = (() => {
-        const url = new URL("/teams", API_BASE);
-        if (IS_BASKETBALL_V1) {
+      const teamUrls = [
+        (() => {
+          const url = new URL("/teams", API_BASE);
           url.searchParams.set("league", LEAGUE);
           url.searchParams.set("season", teamSeason);
-        }
-        return url.toString();
-      })();
-      const resTeams = await fetch(teamUrl, {
-        headers: { "x-apisports-key": API_KEY },
-        cache: "no-store",
-      });
-      const teamsData = resTeams.ok ? ((await resTeams.json()) as any) : null;
-      const ids =
-        teamsData && Array.isArray(teamsData.response)
-          ? teamsData.response.map((t: any) => t.id).filter(Boolean)
-          : [];
-      if (teamsData && Array.isArray(teamsData.response)) {
-        for (const t of teamsData.response) {
-          const id = Number(t?.id ?? NaN);
-          const name = String(t?.name ?? "").trim();
-          if (Number.isFinite(id) && id > 0 && name) {
-            teamNameById.set(id, name);
+          return url.toString();
+        })(),
+        (() => {
+          const url = new URL("/teams", API_BASE);
+          return url.toString();
+        })(),
+      ];
+
+      for (const teamUrl of teamUrls) {
+        const resTeams = await fetch(teamUrl, {
+          headers: { "x-apisports-key": API_KEY },
+          cache: "no-store",
+        });
+        const teamsData = resTeams.ok ? ((await resTeams.json()) as any) : null;
+        const ids =
+          teamsData && Array.isArray(teamsData.response)
+            ? teamsData.response
+                .filter((t: any) => t?.nbaFranchise === true)
+                .map((t: any) => t.id)
+                .filter(Boolean)
+            : [];
+        if (teamsData && Array.isArray(teamsData.response)) {
+          for (const t of teamsData.response) {
+            if (t?.nbaFranchise !== true) continue;
+            const id = Number(t?.id ?? NaN);
+            const name = String(t?.name ?? "").trim();
+            if (Number.isFinite(id) && id > 0 && name) {
+              teamNameById.set(id, name);
+            }
           }
         }
+        attempts.push({
+          step: "teams",
+          results: teamsData?.results,
+          errors: teamsData?.errors ?? (!resTeams.ok ? resTeams.status : undefined),
+          url: teamUrl,
+        });
+        if (ids.length) {
+          teamIds = ids;
+          resolvedSeasonForTeams = teamSeason;
+          break;
+        }
       }
-      attempts.push({
-        step: "teams",
-        results: teamsData?.results,
-        errors: teamsData?.errors ?? (!resTeams.ok ? resTeams.status : undefined),
-        url: teamUrl,
-      });
-      if (ids.length) {
-        teamIds = ids;
-        resolvedSeasonForTeams = teamSeason;
-        break;
-      }
+      if (teamIds.length) break;
     }
 
     if (!teamIds.length) {
@@ -151,7 +175,11 @@ export async function GET() {
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        attempts.push({ team: tid, errors: res.status + " " + text, url: url.toString() });
+        attempts.push({
+          team: tid,
+          errors: `${res.status} ${text}`,
+          url: url.toString(),
+        });
         continue;
       }
 
@@ -171,38 +199,21 @@ export async function GET() {
     }
 
     const mapped: NbaPlayerRecord[] = collected.map((p) => {
-      if (IS_BASKETBALL_V1) {
-        const rawName = p.name ?? "";
-        const parts = rawName.split(/\s+/).filter(Boolean);
-        const firstName = parts.length >= 2 ? parts[parts.length - 1] : parts[0] ?? null;
-        const lastName =
-          parts.length >= 2 ? parts.slice(0, -1).join(" ") : null;
-        const fullName = [firstName, lastName].filter(Boolean).join(" ") || rawName;
-        return {
-          id: p.id,
-          firstName,
-          lastName,
-          fullName,
-          teamId: p.team?.id ?? p._teamIdHint ?? null,
-          teamName: p.team?.name ?? p._teamNameHint ?? null,
-          teamCode: null,
-          position: p.position ?? null,
-          jerseyNumber: p.number ? String(p.number) : null,
-          age: null,
-          nationality: p.country ?? null,
-          height: null,
-          weight: null,
-          birthDate: null,
-          isActive: null,
-        };
-      }
+      const resolvedTeamId =
+        positiveIntOrNull(p.team?.id) ?? positiveIntOrNull(p._teamIdHint) ?? null;
+      const resolvedTeamName = p.team?.name ?? p._teamNameHint ?? null;
+      const firstName = p.firstname ?? null;
+      const lastName = p.lastname ?? null;
+      const fullNameFromSplit = [firstName, lastName].filter(Boolean).join(" ").trim();
       return {
         id: p.id,
-        firstName: p.firstname ?? null,
-        lastName: p.lastname ?? null,
-        fullName: [p.firstname, p.lastname].filter(Boolean).join(" ") || `Player ${p.id}`,
-        teamId: p.team?.id ?? null,
-        teamName: p.team?.name ?? null,
+        firstName,
+        lastName,
+        fullName: fullNameFromSplit || p.name || `Player ${p.id}`,
+        // NBA v2 /players often returns team.id = 0 or null.
+        // Keep only strictly positive ids and fallback to loop team hint.
+        teamId: resolvedTeamId,
+        teamName: resolvedTeamName,
         teamCode: null,
         position: p.leagues?.standard?.pos ?? null,
         jerseyNumber: p.leagues?.standard?.jersey
@@ -234,9 +245,7 @@ export async function GET() {
     const outFile = path.join(
       process.cwd(),
       "data",
-      IS_BASKETBALL_V1
-        ? `nba-players-${season.replace(/[^0-9]/g, "")}.json`
-        : `nba-players-nba-v2-${season}.json`,
+      `nba-players-nba-v2-${season}.json`,
     );
     await fs.writeFile(outFile, JSON.stringify(payload, null, 2), "utf-8");
 
@@ -245,12 +254,18 @@ export async function GET() {
       source: "sync-players-v2",
       players: uniquePlayers,
     }).catch(() => 0);
+    const prune = await pruneNbaPlayersForSeason({
+      season,
+      keepPlayerIds: uniquePlayers.map((player) => player.id),
+      minKeepCount: MIN_SAFE_PLAYERS_FOR_PRUNE,
+    }).catch(() => ({ kept: uniquePlayers.length, deleted: 0, skipped: true }));
 
     return NextResponse.json({
       ok: true,
       saved: outFile,
       count: uniquePlayers.length,
       dbUpserted,
+      prune,
       attempts,
     });
   } catch (err: any) {

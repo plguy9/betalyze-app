@@ -10,9 +10,7 @@ import {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DEFAULT_SEASON = normalizeNbaSeasonLabel(
-  process.env.APISPORTS_BASKETBALL_SEASON ??
-  process.env.APISPORTS_NBA_SEASON ??
-  "2025-2026",
+  process.env.APISPORTS_NBA_SEASON ?? "2025",
 );
 const MAX_LIMIT = 30;
 const MAX_CHUNK = 100;

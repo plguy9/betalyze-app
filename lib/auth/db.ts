@@ -235,6 +235,67 @@ export async function revokeAllAuthSessionsForUser(userId: number): Promise<void
   `;
 }
 
+// ── Stripe ────────────────────────────────────────────────────────────────────
+
+export async function ensureStripeColumns(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    alter table app_users
+      add column if not exists stripe_customer_id text unique,
+      add column if not exists stripe_subscription_id text,
+      add column if not exists subscription_status text not null default 'free',
+      add column if not exists subscription_current_period_end timestamptz;
+  `);
+}
+
+export async function getStripeCustomerId(userId: number): Promise<string | null> {
+  await ensureStripeColumns();
+  const rows = await prisma.$queryRaw<{ stripe_customer_id: string | null }[]>`
+    select stripe_customer_id from app_users where id = ${userId} limit 1
+  `;
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
+export async function getSubscriptionStatus(userId: number): Promise<string> {
+  await ensureStripeColumns();
+  const rows = await prisma.$queryRaw<{ subscription_status: string }[]>`
+    select subscription_status from app_users where id = ${userId} limit 1
+  `;
+  return rows[0]?.subscription_status ?? "free";
+}
+
+export async function upsertStripeSubscription(params: {
+  userId: number;
+  customerId: string;
+  subscriptionId: string;
+  status: string;
+  currentPeriodEnd?: Date | null;
+}): Promise<void> {
+  await ensureStripeColumns();
+  if (params.userId > 0) {
+    await prisma.$executeRaw`
+      update app_users
+      set
+        stripe_customer_id = ${params.customerId},
+        stripe_subscription_id = ${params.subscriptionId},
+        subscription_status = ${params.status},
+        subscription_current_period_end = ${params.currentPeriodEnd ?? null},
+        updated_at = now()
+      where id = ${params.userId}
+    `;
+  } else {
+    // Fallback par customer_id si userId indisponible
+    await prisma.$executeRaw`
+      update app_users
+      set
+        stripe_subscription_id = ${params.subscriptionId},
+        subscription_status = ${params.status},
+        subscription_current_period_end = ${params.currentPeriodEnd ?? null},
+        updated_at = now()
+      where stripe_customer_id = ${params.customerId}
+    `;
+  }
+}
+
 export async function deleteAuthUserById(userId: number): Promise<void> {
   await ensureAuthTables();
   await prisma.$executeRaw`

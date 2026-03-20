@@ -1,0 +1,2006 @@
+{
+  "date": "2026-03-12",
+  "season": "2025",
+  "teamsCount": 18,
+  "playersCount": 333,
+  "players": [
+    {
+      "playerId": 4317,
+      "fullName": "A. Newell",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 3449,
+      "fullName": "Caleb Houstan",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 2825,
+      "fullName": "Corey Kispert",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 3406,
+      "fullName": "Dyson Daniels",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4302,
+      "fullName": "E. N'Diaye",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4007,
+      "fullName": "Jacob Toppin",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 2819,
+      "fullName": "Jalen Johnson",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 3259,
+      "fullName": "Keaton Wallace",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4256,
+      "fullName": "L. Butler",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 3939,
+      "fullName": "Mouhamed Gueye",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4319,
+      "fullName": "N. Djurisic",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4116,
+      "fullName": "N'Faly Dante",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 1845,
+      "fullName": "Nickeil Alexander-Walker",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 2629,
+      "fullName": "Onyeka Okongwu",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4090,
+      "fullName": "Zaccharie Risacher",
+      "teamId": 1,
+      "teamName": "Atlanta Hawks"
+    },
+    {
+      "playerId": 4287,
+      "fullName": "A. Williams",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4092,
+      "fullName": "Baylor Scheierman",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4194,
+      "fullName": "Gonzalez Hugo",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4161,
+      "fullName": "Jalen Bridges",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 75,
+      "fullName": "Jaylen Brown",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 3943,
+      "fullName": "Jordan Walsh",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 3470,
+      "fullName": "Josh Minott",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 3423,
+      "fullName": "Kendall Brown",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 2807,
+      "fullName": "Luka Garza",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4285,
+      "fullName": "M. Shulga",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 2844,
+      "fullName": "Neemias Queta",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 2635,
+      "fullName": "Payton Pritchard",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4284,
+      "fullName": "R. Luis Jr.",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 3447,
+      "fullName": "Ron Harper Jr.",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 2812,
+      "fullName": "Sam Hauser",
+      "teamId": 2,
+      "teamName": "Boston Celtics"
+    },
+    {
+      "playerId": 4240,
+      "fullName": "B. Saraf",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 2855,
+      "fullName": "Cam Thomas",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 4271,
+      "fullName": "D. Powell",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 4269,
+      "fullName": "D. Wolf",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 3945,
+      "fullName": "Dariq Whitehead",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 2848,
+      "fullName": "Day'Ron Sharpe",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 4185,
+      "fullName": "Demin Egor",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 4272,
+      "fullName": "F. Zeng",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 3946,
+      "fullName": "Jalen Wilson",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 1014,
+      "fullName": "Michael Porter Jr.",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 4274,
+      "fullName": "N. Traore",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 1854,
+      "fullName": "Nic Claxton",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 3944,
+      "fullName": "Noah Clowney",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 1877,
+      "fullName": "Terance Mann",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 3437,
+      "fullName": "Tyson Etienne",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 2864,
+      "fullName": "Ziaire Williams",
+      "teamId": 4,
+      "teamName": "Brooklyn Nets"
+    },
+    {
+      "playerId": 1900,
+      "fullName": "Coby White",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 1021,
+      "fullName": "Collin Sexton",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 3462,
+      "fullName": "E.J. Liddell",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4103,
+      "fullName": "Emanuel Miller",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 2630,
+      "fullName": "Isaac Okoro",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 2644,
+      "fullName": "Jalen Smith",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 2808,
+      "fullName": "Josh Giddey",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4275,
+      "fullName": "L. Olbrich",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4098,
+      "fullName": "Matas Buzelis",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 3445,
+      "fullName": "Mouhamadou Gueye",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4297,
+      "fullName": "N. Essengue",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 2664,
+      "fullName": "Patrick Williams",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 2606,
+      "fullName": "Tre Jones",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4123,
+      "fullName": "Trentyn Flowers",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 4131,
+      "fullName": "Yuki Kawamura",
+      "teamId": 6,
+      "teamName": "Chicago Bulls"
+    },
+    {
+      "playerId": 126,
+      "fullName": "Anthony Davis",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 3398,
+      "fullName": "Brandon Williams",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4320,
+      "fullName": "C. Flagg",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 2242,
+      "fullName": "Caleb Martin",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 462,
+      "fullName": "D'Angelo Russell",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 1859,
+      "fullName": "Daniel Gafford",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4044,
+      "fullName": "Dereck II Lively",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 433,
+      "fullName": "Dwight Powell",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4312,
+      "fullName": "M. Cisse",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4305,
+      "fullName": "M. Cleveland",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4308,
+      "fullName": "M. Kelly",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 2668,
+      "fullName": "Naji Marshall",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 1897,
+      "fullName": "P.J. Washington",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 4311,
+      "fullName": "R. Nembhard",
+      "teamId": 8,
+      "teamName": "Dallas Mavericks"
+    },
+    {
+      "playerId": 195,
+      "fullName": "Aaron Gordon",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 944,
+      "fullName": "Bruce Brown",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 1871,
+      "fullName": "Cameron Johnson",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3420,
+      "fullName": "Christian Braun",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4330,
+      "fullName": "Curtis Jones",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4107,
+      "fullName": "DaRon II Holmes",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3967,
+      "fullName": "Hunter Tyson",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3965,
+      "fullName": "Jalen Pickett",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 383,
+      "fullName": "Jamal Murray",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4139,
+      "fullName": "James Akinjo",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3966,
+      "fullName": "Julian Strawther",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4096,
+      "fullName": "K.J. Simpson",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 2805,
+      "fullName": "Kessler Edwards",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 2160,
+      "fullName": "Moses Brown",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 279,
+      "fullName": "Nikola Jokic",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3498,
+      "fullName": "Peyton Watson",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4108,
+      "fullName": "Spencer Jones",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 4328,
+      "fullName": "Tamar Bates",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 215,
+      "fullName": "Tim Hardaway Jr.",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 2627,
+      "fullName": "Zeke Nnaji",
+      "teamId": 9,
+      "teamName": "Denver Nuggets"
+    },
+    {
+      "playerId": 3971,
+      "fullName": "Ausar Thompson",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4316,
+      "fullName": "B. Williams",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4322,
+      "fullName": "C. Lanier",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 2801,
+      "fullName": "Cade Cunningham",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 317,
+      "fullName": "Caris LeVert",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4023,
+      "fullName": "Charles Bediako",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4020,
+      "fullName": "Colby Jones",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4112,
+      "fullName": "Daniss Jenkins",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 1018,
+      "fullName": "Duncan Robinson",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 2648,
+      "fullName": "Isaiah Stewart",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 3451,
+      "fullName": "Jaden Ivey",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 3433,
+      "fullName": "Jalen Duren",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 2404,
+      "fullName": "Javonte Green",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 3970,
+      "fullName": "Marcus Sasser",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 2638,
+      "fullName": "Paul Reed",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4111,
+      "fullName": "Ron II Holland",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 222,
+      "fullName": "Tobias Harris",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 4211,
+      "fullName": "Tolu Smith",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 3474,
+      "fullName": "Wendell Moore Jr.",
+      "teamId": 10,
+      "teamName": "Detroit Pistons"
+    },
+    {
+      "playerId": 2626,
+      "fullName": "Aaron Nesmith",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 3476,
+      "fullName": "Andrew Nembhard",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 3979,
+      "fullName": "Ben Sheppard",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 4109,
+      "fullName": "Gabe McGlothan",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 4021,
+      "fullName": "Jalen Slawson",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 2666,
+      "fullName": "James Wiseman",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 3981,
+      "fullName": "Jarace Walker",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 2814,
+      "fullName": "Jay Huff",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 2846,
+      "fullName": "Jeremiah Robinson-Earl",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 4119,
+      "fullName": "Johnny Furphy",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 2833,
+      "fullName": "Mac McClung",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 2658,
+      "fullName": "Obi Toppin",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 479,
+      "fullName": "Pascal Siakam",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 3452,
+      "fullName": "Quenton Jackson",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 4296,
+      "fullName": "T. Peter",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 348,
+      "fullName": "T.J. McConnell",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 748,
+      "fullName": "Tony Bradley",
+      "teamId": 15,
+      "teamName": "Indiana Pacers"
+    },
+    {
+      "playerId": 4339,
+      "fullName": "Adou Thiero",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4093,
+      "fullName": "Anton Watson",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 2845,
+      "fullName": "Austin Reaves",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4125,
+      "fullName": "Bronny James",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4340,
+      "fullName": "Chris Manon",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4126,
+      "fullName": "Dalton Knecht",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 3999,
+      "fullName": "Drew Timme",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 1775,
+      "fullName": "Gabe Vincent",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 1036,
+      "fullName": "Jarred Vanderbilt",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 3397,
+      "fullName": "Jarron Cumberland",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 1864,
+      "fullName": "Jaxson Hayes",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 3931,
+      "fullName": "Jeenathan Williams",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 2670,
+      "fullName": "Kylor Kelley",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 265,
+      "fullName": "LeBron James",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 486,
+      "fullName": "Marcus Smart",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 3427,
+      "fullName": "Max Christie",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4042,
+      "fullName": "Nick Jr. Smith",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 4326,
+      "fullName": "R. Davis",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 1862,
+      "fullName": "Rui Hachimura",
+      "teamId": 17,
+      "teamName": "Los Angeles Lakers"
+    },
+    {
+      "playerId": 1853,
+      "fullName": "Brandon Clarke",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3091,
+      "fullName": "Braxton Key",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4323,
+      "fullName": "C. Coward",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4132,
+      "fullName": "Cam Spencer",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3458,
+      "fullName": "Christian Koloko",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3994,
+      "fullName": "GG Jackson",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4292,
+      "fullName": "J. Small",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 1881,
+      "fullName": "Ja Morant",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3460,
+      "fullName": "Jake LaRavia",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4133,
+      "fullName": "Jaylen Wells",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 1485,
+      "fullName": "Jock Landale",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 89,
+      "fullName": "Kentavious Caldwell-Pope",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4293,
+      "fullName": "L. Lovering",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 2672,
+      "fullName": "Nate Hinton",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3960,
+      "fullName": "OlivierMaxence Prosper",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4106,
+      "fullName": "PJ Hall",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 2786,
+      "fullName": "Santi Aldama",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 3477,
+      "fullName": "Scotty Pippen Jr.",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4288,
+      "fullName": "T. Burton",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 1870,
+      "fullName": "Ty Jerome",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4130,
+      "fullName": "Zach Edey",
+      "teamId": 19,
+      "teamName": "Memphis Grizzlies"
+    },
+    {
+      "playerId": 4310,
+      "fullName": "D. Dainja",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 2834,
+      "fullName": "Davion Mitchell",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3360,
+      "fullName": "Dru Smith",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3237,
+      "fullName": "Ethan Thompson",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4260,
+      "fullName": "G. Madsen",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4110,
+      "fullName": "Jahmir Young",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4085,
+      "fullName": "Jamie Jr. Jaquez",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4294,
+      "fullName": "K. Jakucionis",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4138,
+      "fullName": "Kel'el Ware",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4134,
+      "fullName": "Keshad Johnson",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4309,
+      "fullName": "M. Gardner",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3453,
+      "fullName": "Nikola Jovic",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 434,
+      "fullName": "Norman Powell",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3482,
+      "fullName": "Orlando Robinson",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4135,
+      "fullName": "Pelle Larsson",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3438,
+      "fullName": "Simone Fontecchio",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 458,
+      "fullName": "Terry Rozier",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3456,
+      "fullName": "Trevor Keels",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 1866,
+      "fullName": "Tyler Herro",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 4313,
+      "fullName": "V. Goldin",
+      "teamId": 20,
+      "teamName": "Miami Heat"
+    },
+    {
+      "playerId": 3443,
+      "fullName": "A.J. Green",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 4047,
+      "fullName": "Andre Jr. Jackson",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 431,
+      "fullName": "Bobby Portis",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 3997,
+      "fullName": "Chris Livingston",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 2563,
+      "fullName": "Cole Anthony",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 4216,
+      "fullName": "Cormac Ryan",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 220,
+      "fullName": "Gary Harris",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 1058,
+      "fullName": "Gary Trent Jr.",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 20,
+      "fullName": "Giannis Antetokounmpo",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 3418,
+      "fullName": "Jamaree Bouyea",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 2849,
+      "fullName": "Jericho Sims",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 1888,
+      "fullName": "Kevin Porter Jr.",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 4318,
+      "fullName": "M. Sears",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 3405,
+      "fullName": "MarJon Beauchamp",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 3957,
+      "fullName": "Pete Nance",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 3484,
+      "fullName": "Ryan Rollins",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 437,
+      "fullName": "Taurean Prince",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 2408,
+      "fullName": "Thanasis Antetokounmpo",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 4141,
+      "fullName": "Tyler Smith",
+      "teamId": 21,
+      "teamName": "Milwaukee Bucks"
+    },
+    {
+      "playerId": 2863,
+      "fullName": "Aaron Wiggins",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4153,
+      "fullName": "Ajay Mitchell",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4332,
+      "fullName": "B. Barnhizer",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4173,
+      "fullName": "Branden Carlson",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3417,
+      "fullName": "Buddy Boeheim",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4331,
+      "fullName": "C. Youngblood",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4009,
+      "fullName": "Cason Wallace",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3448,
+      "fullName": "Chet Holmgren",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 978,
+      "fullName": "Isaiah Hartenstein",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 2604,
+      "fullName": "Isaiah Joe",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3504,
+      "fullName": "Jalen Williams",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3505,
+      "fullName": "Jaylin Williams",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3996,
+      "fullName": "Jazian Gortman",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 1044,
+      "fullName": "Kenrich Williams",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 2040,
+      "fullName": "Luguentz Dort",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4215,
+      "fullName": "Malevy Leons",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4154,
+      "fullName": "Nikola Topic",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3432,
+      "fullName": "Ousmane Dieng",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 972,
+      "fullName": "Shai Gilgeous-Alexander",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 4327,
+      "fullName": "Z. Austin",
+      "teamId": 25,
+      "teamName": "Oklahoma City Thunder"
+    },
+    {
+      "playerId": 3924,
+      "fullName": "Alex Morales",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4010,
+      "fullName": "Anthony Black",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 3987,
+      "fullName": "Colin Castleton",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 2568,
+      "fullName": "Desmond Bane",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 2858,
+      "fullName": "Franz Wagner",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 1848,
+      "fullName": "Goga Bitadze",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4321,
+      "fullName": "J. Richardson",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 2990,
+      "fullName": "Jalen Crutcher",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 2852,
+      "fullName": "Jalen Suggs",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 3424,
+      "fullName": "Jamal Cain",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4011,
+      "fullName": "Jett Howard",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 801,
+      "fullName": "Jonathan Isaac",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 3480,
+      "fullName": "Lester Quinones",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4315,
+      "fullName": "N. Penda",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 3414,
+      "fullName": "Paolo Banchero",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4114,
+      "fullName": "Reece Beekman",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4155,
+      "fullName": "Tristan Silva da",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 950,
+      "fullName": "Wendell Carter Jr.",
+      "teamId": 26,
+      "teamName": "Orlando Magic"
+    },
+    {
+      "playerId": 4156,
+      "fullName": "Adem Bona",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 147,
+      "fullName": "Andre Drummond",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 417,
+      "fullName": "Cameron Payne",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 2790,
+      "fullName": "Charles Bassey",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3494,
+      "fullName": "Dalen Terry",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3415,
+      "fullName": "Dominick Barlow",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3956,
+      "fullName": "Emoni Bates",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 196,
+      "fullName": "Eric Gordon",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4267,
+      "fullName": "H. Sallis",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4304,
+      "fullName": "J. Broome",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3496,
+      "fullName": "Jabari Walker",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4159,
+      "fullName": "Jared McCain",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 159,
+      "fullName": "Joel Embiid",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4217,
+      "fullName": "Justin Edwards",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 407,
+      "fullName": "Kelly Oubre Jr.",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3426,
+      "fullName": "Kennedy Chandler",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 327,
+      "fullName": "Kyle Lowry",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3380,
+      "fullName": "Malcolm Hill",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 189,
+      "fullName": "Paul George",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 2811,
+      "fullName": "Quentin Grimes",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4306,
+      "fullName": "S. Thomas",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 2861,
+      "fullName": "Trendon Watford",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 3465,
+      "fullName": "Tyrese Martin",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 2619,
+      "fullName": "Tyrese Maxey",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 4303,
+      "fullName": "V. Edgecombe",
+      "teamId": 27,
+      "teamName": "Philadelphia 76ers"
+    },
+    {
+      "playerId": 2115,
+      "fullName": "Amir Coffey",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4250,
+      "fullName": "C. Huntley",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 3441,
+      "fullName": "Collin Gillespie",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 2804,
+      "fullName": "David Duke Jr.",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 64,
+      "fullName": "Devin Booker",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 1815,
+      "fullName": "Haywood Highsmith",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 2829,
+      "fullName": "Isaiah Livers",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 2796,
+      "fullName": "Jared Butler",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 3341,
+      "fullName": "Jordan Goodwin",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4264,
+      "fullName": "K. Brea",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4273,
+      "fullName": "K. Maluach",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 3506,
+      "fullName": "Mark Williams",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 2639,
+      "fullName": "Nick Richards",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 792,
+      "fullName": "Nigel Hayes",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4163,
+      "fullName": "Oso Ighodaro",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4270,
+      "fullName": "R. Fleming",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4162,
+      "fullName": "Ryan Dunn",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 285,
+      "fullName": "Tyus Jones",
+      "teamId": 28,
+      "teamName": "Phoenix Suns"
+    },
+    {
+      "playerId": 4084,
+      "fullName": "A. Flagler",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 54,
+      "fullName": "Bismack Biyombo",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4295,
+      "fullName": "C. Bryant",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4266,
+      "fullName": "D. Harper",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4158,
+      "fullName": "David Jones",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 776,
+      "fullName": "De'Aaron Fox",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 2661,
+      "fullName": "Devin Vassell",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 36,
+      "fullName": "Harrison Barnes",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4170,
+      "fullName": "Harrison Ingram",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 3490,
+      "fullName": "Jeremy Sochan",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 3425,
+      "fullName": "Julian Champagnie",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 1872,
+      "fullName": "Keldon Johnson",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 404,
+      "fullName": "Kelly Olynyk",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 3404,
+      "fullName": "Lindy Waters III",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 426,
+      "fullName": "Mason Plumlee",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 3358,
+      "fullName": "Micah Potter",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4171,
+      "fullName": "Riley Minix",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 3790,
+      "fullName": "Stanley Umude",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4169,
+      "fullName": "Stephon Castle",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4026,
+      "fullName": "Victor Wembanyama",
+      "teamId": 31,
+      "teamName": "San Antonio Spurs"
+    },
+    {
+      "playerId": 4140,
+      "fullName": "AJ Johnson",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4184,
+      "fullName": "Alex Sarr",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 3503,
+      "fullName": "Alondes Williams",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 2590,
+      "fullName": "Anthony Gill",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4036,
+      "fullName": "Bilal Coulibaly",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4182,
+      "fullName": "Bub Carrington",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 3978,
+      "fullName": "Cam Whitmore",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4152,
+      "fullName": "Dillon Jones",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4261,
+      "fullName": "J. Watkins",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 3407,
+      "fullName": "Jaden Hardy",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 2798,
+      "fullName": "Justin Champagnie",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4243,
+      "fullName": "K. Gilbert",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4255,
+      "fullName": "K. Richmond",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 361,
+      "fullName": "Khris Middleton",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4183,
+      "fullName": "Kyshawn George",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 3948,
+      "fullName": "Leaky Black",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 3419,
+      "fullName": "Malaki Branham",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 2800,
+      "fullName": "Sharife Cooper",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 302,
+      "fullName": "Skal Labissiere",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4263,
+      "fullName": "T. Johnson",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4088,
+      "fullName": "T. Vukcevic",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    },
+    {
+      "playerId": 4262,
+      "fullName": "W. Riley",
+      "teamId": 41,
+      "teamName": "Washington Wizards"
+    }
+  ]
+}

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  readNbaTopPropsDailyCache,
+  writeNbaTopPropsDailyCache,
+} from "@/lib/supabase/nba-top-props-cache";
 
-const LEAGUE_ID =
-  process.env.APISPORTS_BASKETBALL_LEAGUE_ID ??
-  process.env.APISPORTS_NBA_LEAGUE_ID ??
-  "12";
-const NBA_LEAGUE_ID_NUM = Number(LEAGUE_ID);
+const RAW_LEAGUE_ID =
+  process.env.APISPORTS_NBA_LEAGUE_ID ?? "standard";
+const NORMALIZED_GAMES_LEAGUE = (() => {
+  const value = String(RAW_LEAGUE_ID).trim().toLowerCase();
+  if (!value || value === "nba" || value === "12") return "standard";
+  return value;
+})();
+const NBA_LEAGUE_ID_NUM = Number.isFinite(Number(RAW_LEAGUE_ID))
+  ? Number(RAW_LEAGUE_ID)
+  : 12;
 const NBA_REGULAR_START_BY_SEASON: Record<string, string> = {
   "2024": "2024-10-22",
   "2024-2025": "2024-10-22",
@@ -14,12 +23,15 @@ const NBA_REGULAR_START_BY_SEASON: Record<string, string> = {
   "2025-2026": "2025-10-21",
 };
 const QUERY_TIMEZONE = "America/Toronto";
+const MAX_PROP_LOG_AGE_DAYS = 14;
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 type CachedTopPropsPayload = {
   generatedAt: string;
   date: string;
   season: string;
+  mode?: "default" | "alternates_best";
+  gameId: number | null;
   events: number;
   propsAnalyzed: number;
   props: TopProp[];
@@ -39,6 +51,7 @@ const FINISHED_STATUSES = new Set([
   "CAN",
   "PEN",
   "POST",
+  "3",
 ]);
 
 const SLATE_GAME_STATUSES = new Set([
@@ -111,8 +124,8 @@ type ApiGame = {
   status?: { short?: string | null } | null;
   league?: { id?: number | null } | null;
   teams?: {
-    home?: { id?: number | null; name?: string | null };
-    away?: { id?: number | null; name?: string | null };
+    home?: { id?: number | null; name?: string | null; code?: string | null };
+    away?: { id?: number | null; name?: string | null; code?: string | null };
   } | null;
 };
 
@@ -123,6 +136,7 @@ type OddsProp = {
   odd: string | null;
   overOdd?: string | null;
   underOdd?: string | null;
+  isAlternate?: boolean | null;
   teamCode?: string | null;
   opponentCode?: string | null;
   bookmakerName?: string | null;
@@ -132,6 +146,7 @@ type OddsPayload = {
   ok: boolean;
   game: number | null;
   playerProps?: OddsProp[];
+  availableBookmakers?: Array<{ key?: string | null; name?: string | null }>;
 };
 
 type PlayerRow = {
@@ -140,6 +155,13 @@ type PlayerRow = {
   team_id: number | null;
   team_code: string | null;
   position: string | null;
+  updated_at?: string | null;
+};
+
+type PlayerLogFreshnessRow = {
+  player_id: number;
+  last_date: string | null;
+  games: number;
 };
 
 type LogRow = {
@@ -160,6 +182,8 @@ type LogRow = {
   field_goals_attempted: number | null;
   three_points_attempted: number | null;
   free_throws_attempted: number | null;
+  home_away: string | null;
+  result: string | null;
 };
 
 type MetricKey = "PTS" | "REB" | "AST" | "3PT" | "PRA" | "P+A" | "P+R" | "R+A";
@@ -204,7 +228,57 @@ type TopProp = {
   finalScore: number;
   gameId: number | null;
   bookmaker: string | null;
+  hitRate?: number;
+  hitRateL5?: number;
+  hitRateL10?: number;
+  hitRateL20?: number;
+  seasonHitRate?: number;
+  impliedProbability?: number;
+  modelEdge?: number;
+  dvpScore?: number;
+  dvpRank?: number | null;
+  dvpTotalTeams?: number | null;
+  dvpValue?: number | null;
+  dvpMetricFlag?: "weakness" | "strength" | "neutral" | null;
+  dvpPosition?: string | null;
+  consistencyScore?: number;
+  recommendationTag?: "SAFE" | "BALANCED" | "AGGRESSIVE" | "LONGSHOT";
+  restDaysEdge?: number;
+  splitEdge?: number;
 };
+
+function parseCachedPayload(raw: unknown): CachedTopPropsPayload | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const payload = raw as Record<string, unknown>;
+  if (typeof payload.generatedAt !== "string") return null;
+  if (typeof payload.date !== "string") return null;
+  if (typeof payload.season !== "string") return null;
+  const events = Number(payload.events);
+  const propsAnalyzed = Number(payload.propsAnalyzed);
+  if (!Number.isFinite(events) || !Number.isFinite(propsAnalyzed)) return null;
+  const props = Array.isArray(payload.props) ? (payload.props as TopProp[]) : null;
+  if (!props) return null;
+  const rawGameId = payload.gameId;
+  const gameId =
+    rawGameId === null || rawGameId === undefined
+      ? null
+      : Number.isFinite(Number(rawGameId))
+        ? Math.trunc(Number(rawGameId))
+        : null;
+  return {
+    generatedAt: payload.generatedAt,
+    date: payload.date,
+    season: payload.season,
+    mode:
+      payload.mode === "alternates_best" || payload.mode === "default"
+        ? payload.mode
+        : "default",
+    gameId,
+    events: Math.trunc(events),
+    propsAnalyzed: Math.trunc(propsAnalyzed),
+    props,
+  };
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -226,6 +300,93 @@ function parseOdd(value: string | null | undefined): number | null {
   return n;
 }
 
+function decimalToAmericanOdds(decimal: number): number | null {
+  if (!Number.isFinite(decimal) || decimal <= 1) return null;
+  if (decimal >= 2) return Math.round((decimal - 1) * 100);
+  return Math.round(-100 / (decimal - 1));
+}
+
+function weightedAverage(
+  items: Array<{ value: number; weight: number; enabled?: boolean }>,
+): number {
+  let weighted = 0;
+  let totalWeight = 0;
+  for (const item of items) {
+    if (!Number.isFinite(item.value) || !Number.isFinite(item.weight) || item.weight <= 0) continue;
+    if (item.enabled === false) continue;
+    weighted += item.value * item.weight;
+    totalWeight += item.weight;
+  }
+  if (totalWeight <= 0) return 0;
+  return weighted / totalWeight;
+}
+
+function dvpScoreFromRank(rank: number | null): number {
+  if (!rank || !Number.isFinite(rank)) return 0;
+  if (rank <= 5) return -10;
+  if (rank <= 10) return -5;
+  if (rank <= 20) return 0;
+  if (rank <= 25) return 5;
+  return 10;
+}
+
+function consistencyScoreFromCv(cv: number): number {
+  if (!Number.isFinite(cv)) return 0;
+  if (cv <= 0.18) return 10;
+  if (cv <= 0.28) return 5;
+  if (cv <= 0.38) return 0;
+  if (cv <= 0.5) return -5;
+  return -10;
+}
+
+function recommendationTagFromSignals(
+  hitRate: number,
+  americanOdds: number | null,
+): "SAFE" | "BALANCED" | "AGGRESSIVE" | "LONGSHOT" {
+  if (
+    Number.isFinite(hitRate) &&
+    hitRate > 70 &&
+    americanOdds !== null &&
+    americanOdds >= -300 &&
+    americanOdds <= -150
+  ) {
+    return "SAFE";
+  }
+  if (
+    Number.isFinite(hitRate) &&
+    hitRate >= 55 &&
+    hitRate <= 70 &&
+    americanOdds !== null &&
+    americanOdds >= -150 &&
+    americanOdds <= 120
+  ) {
+    return "BALANCED";
+  }
+  if (
+    Number.isFinite(hitRate) &&
+    hitRate >= 45 &&
+    hitRate < 55 &&
+    americanOdds !== null &&
+    americanOdds > 120
+  ) {
+    return "AGGRESSIVE";
+  }
+  if (
+    Number.isFinite(hitRate) &&
+    hitRate < 45 &&
+    americanOdds !== null &&
+    americanOdds > 200
+  ) {
+    return "LONGSHOT";
+  }
+
+  // Fallback classification keeps tags deterministic when a line sits between rule buckets.
+  if (hitRate >= 70) return "SAFE";
+  if (hitRate >= 55) return "BALANCED";
+  if (hitRate >= 45) return "AGGRESSIVE";
+  return "LONGSHOT";
+}
+
 function avg(values: number[]) {
   if (!values.length) return 0;
   return values.reduce((s, v) => s + v, 0) / values.length;
@@ -236,6 +397,50 @@ function stdDev(values: number[]) {
   const mean = avg(values);
   const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
   return Math.sqrt(variance);
+}
+
+// ── Rest days edge (courbe de récupération NBA) ──────────────────────────────
+// daysSinceLast = nombre de jours entre le dernier match joué et le match ce soir
+function computeRestDaysEdge(lastGameDateStr: string | null, slateDateStr: string): number {
+  if (!lastGameDateStr || !slateDateStr) return 0;
+  const last = Date.parse(lastGameDateStr.slice(0, 10));
+  const slate = Date.parse(slateDateStr.slice(0, 10));
+  if (!Number.isFinite(last) || !Number.isFinite(slate)) return 0;
+  const days = Math.round((slate - last) / 86_400_000);
+  if (days <= 0) return 0;
+  if (days === 1) return -5;  // B2B
+  if (days === 2) return -2;  // 1 jour de repos
+  if (days === 3) return 0;   // 2 jours — neutre
+  if (days === 4) return 2;   // pic de fraîcheur
+  if (days === 5) return 1;   // encore frais
+  if (days <= 7) return 0;    // 5–6 jours — neutre
+  if (days <= 12) return -2;  // rythme perturbé
+  return -4;                  // longue absence
+}
+
+// ── Split edge (home vs away) ────────────────────────────────────────────────
+// Évalue si le contexte de ce soir (dom/ext) est favorable pour ce joueur
+function computeSplitEdge(
+  logs: Array<{ home_away: string | null; [key: string]: unknown }>,
+  valueExtractor: (row: { [key: string]: unknown }) => number | null,
+  isHome: boolean,
+  line: number,
+): number {
+  if (line <= 0) return 0;
+  const homeVals = logs
+    .filter((r) => String(r.home_away ?? "").toLowerCase() === "home")
+    .map(valueExtractor)
+    .filter((v): v is number => Number.isFinite(v ?? NaN));
+  const awayVals = logs
+    .filter((r) => String(r.home_away ?? "").toLowerCase() === "away")
+    .map(valueExtractor)
+    .filter((v): v is number => Number.isFinite(v ?? NaN));
+  if (homeVals.length < 5 || awayVals.length < 5) return 0;
+  const homeAvg = avg(homeVals);
+  const awayAvg = avg(awayVals);
+  // diff positif = joueur meilleur dans le contexte de ce soir
+  const splitDiff = isHome ? homeAvg - awayAvg : awayAvg - homeAvg;
+  return clamp((splitDiff / line) * 15, -6, 6);
 }
 
 function pctHit(values: number[], line: number, side: "over" | "under") {
@@ -346,17 +551,6 @@ function valueFromLog(row: LogRow, metric: MetricKey): number | null {
   return null;
 }
 
-function minLineForMetric(metric: MetricKey): number {
-  if (metric === "PTS") return 8;
-  if (metric === "REB") return 3;
-  if (metric === "AST") return 3;
-  if (metric === "3PT") return 1;
-  if (metric === "PRA") return 14;
-  if (metric === "P+A") return 10;
-  if (metric === "P+R") return 11;
-  return 6; // R+A
-}
-
 function resolveRegularSeasonStart(seasonInput: string): number | null {
   const normalized = seasonInput.trim();
   const explicit = NBA_REGULAR_START_BY_SEASON[normalized];
@@ -454,34 +648,36 @@ function baseGradeFromScore(score: number) {
 function gradeFromSignals(params: {
   score: number;
   hitPct: number;
-  edgePct: number;
   sampleSize: number;
   cv: number;
 }) {
-  const { score, hitPct, edgePct, sampleSize, cv } = params;
+  const { score, hitPct, sampleSize, cv } = params;
+  // Keep exactly the same grading gates as the player profile card.
+  if (hitPct >= 74 && sampleSize >= 8 && cv <= 0.28 && score >= 86) return "A+";
+  if (hitPct >= 68 && sampleSize >= 7 && cv <= 0.33 && score >= 80) return "A";
+  if (hitPct >= 62 && sampleSize >= 6 && cv <= 0.38 && score >= 74) return "A-";
 
-  // Hard gates: A+ and A should represent the highest-confidence picks.
-  if (hitPct >= 72 && edgePct >= 8 && sampleSize >= 8 && cv <= 0.28 && score >= 86) return "A+";
-  if (hitPct >= 67 && edgePct >= 5.5 && sampleSize >= 7 && cv <= 0.33 && score >= 80) return "A";
-  if (hitPct >= 62 && edgePct >= 3.5 && sampleSize >= 6 && cv <= 0.38 && score >= 74) return "A-";
-
-  // Reliability caps prevent inflated grades when hit-rate / edge are weak.
   let cappedScore = score;
-  if (hitPct < 52) cappedScore = Math.min(cappedScore, 62); // C+
-  else if (hitPct < 56) cappedScore = Math.min(cappedScore, 69); // B-
-  else if (edgePct < 0) cappedScore = Math.min(cappedScore, 72); // B
+  if (hitPct < 52) cappedScore = Math.min(cappedScore, 62);
+  else if (hitPct < 56) cappedScore = Math.min(cappedScore, 69);
   if (sampleSize < 6) cappedScore = Math.min(cappedScore, 72); // B
 
   return baseGradeFromScore(cappedScore);
 }
 
 function torontoTodayYmd() {
+  // Before 6am Toronto time, still use yesterday's date (NBA games are evening events)
+  const now = new Date();
+  const torontoHour = Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Toronto", hour: "numeric", hour12: false }).format(now)
+  );
+  const effectiveDate = torontoHour < 6 ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+  }).format(effectiveDate);
 }
 
 function addDaysYmd(ymd: string, days: number): string {
@@ -496,6 +692,16 @@ function addDaysYmd(ymd: string, days: number): string {
 
 export async function GET(req: NextRequest) {
   const refresh = req.nextUrl.searchParams.get("refresh") === "1";
+  const modeRaw = String(req.nextUrl.searchParams.get("mode") ?? "")
+    .trim()
+    .toLowerCase();
+  const mode = modeRaw === "alternates" || modeRaw === "alternates_best"
+    ? "alternates_best"
+    : "default";
+  const alternatesBestMode = mode === "alternates_best";
+  const limitRaw = Number(req.nextUrl.searchParams.get("limit") ?? NaN);
+  const alternatesLimit =
+    Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 300) : 140;
   const explicitDate = req.nextUrl.searchParams.get("date");
   const selectedGameIdRaw = Number(req.nextUrl.searchParams.get("gameId") ?? NaN);
   const selectedGameId =
@@ -503,12 +709,27 @@ export async function GET(req: NextRequest) {
       ? Math.trunc(selectedGameIdRaw)
       : null;
   let date = explicitDate || torontoTodayYmd();
-  const cacheKey = `nba-props-top:${date}:${selectedGameId ?? "all"}:${QUERY_TIMEZONE}`;
+  const cacheKey = `nba-props-top:${date}:${selectedGameId ?? "all"}:${QUERY_TIMEZONE}:${mode}`;
   const origin = req.nextUrl.origin;
   const now = Date.now();
   const cached = memoryCache.get(cacheKey);
   if (!refresh && cached && cached.expiresAt > now) {
-    return NextResponse.json({ ok: true, cached: true, ...cached.payload });
+    return NextResponse.json({ ok: true, cached: true, mode, ...cached.payload });
+  }
+  if (!refresh && !alternatesBestMode) {
+    const dbCached = await readNbaTopPropsDailyCache({
+      dateKey: date,
+      gameId: selectedGameId,
+      timezone: QUERY_TIMEZONE,
+    });
+    const parsed = parseCachedPayload(dbCached?.payload ?? null);
+    if (parsed) {
+      memoryCache.set(cacheKey, {
+        expiresAt: now + CACHE_TTL_MS,
+        payload: parsed,
+      });
+      return NextResponse.json({ ok: true, cached: true, mode, ...parsed });
+    }
   }
 
   try {
@@ -516,7 +737,7 @@ export async function GET(req: NextRequest) {
       const seasonForDate = inferSeasonFromDate(targetDate);
       const gamesUrl = new URL("/api/nba/games", origin);
       gamesUrl.searchParams.set("date", targetDate);
-      gamesUrl.searchParams.set("league", LEAGUE_ID);
+      gamesUrl.searchParams.set("league", NORMALIZED_GAMES_LEAGUE);
       gamesUrl.searchParams.set("season", seasonForDate);
       gamesUrl.searchParams.set("timezone", QUERY_TIMEZONE);
       const gamesRes = await fetch(gamesUrl.toString(), {
@@ -531,10 +752,7 @@ export async function GET(req: NextRequest) {
         const id = Number(g.id ?? NaN);
         if (!Number.isFinite(id)) return false;
         const leagueId = Number(g.league?.id ?? NaN);
-        if (
-          Number.isFinite(leagueId) &&
-          String(leagueId) !== String(LEAGUE_ID)
-        ) {
+        if (Number.isFinite(leagueId) && leagueId !== NBA_LEAGUE_ID_NUM) {
           return false;
         }
         return true;
@@ -589,15 +807,59 @@ export async function GET(req: NextRequest) {
           home: homeName,
           away: awayName,
         });
+        // Top opportunities must consume the daily odds cache only.
+        // This endpoint should never trigger upstream odds API usage.
+        params.set("cacheOnly", "1");
         const oddsRes = await fetch(`${origin}/api/nba/odds?${params.toString()}`, {
           cache: "no-store",
         });
         if (!oddsRes.ok) return null;
-        const odds = (await oddsRes.json()) as OddsPayload;
+        let odds = (await oddsRes.json()) as OddsPayload;
         if (!odds.ok || !Array.isArray(odds.playerProps) || !odds.playerProps.length) return null;
 
-        const homeCode = TEAM_CODE_BY_ID[Number(g.teams?.home?.id ?? 0)] ?? null;
-        const awayCode = TEAM_CODE_BY_ID[Number(g.teams?.away?.id ?? 0)] ?? null;
+        if (!alternatesBestMode) {
+          const countMainProps = (payload: OddsPayload) =>
+            (Array.isArray(payload.playerProps) ? payload.playerProps : []).filter(
+              (prop) => prop.isAlternate !== true,
+            ).length;
+          let best = odds;
+          let bestMainCount = countMainProps(odds);
+          const candidates = Array.isArray(odds.availableBookmakers)
+            ? odds.availableBookmakers
+                .map((book) => String(book.key ?? "").trim().toLowerCase())
+                .filter(Boolean)
+            : [];
+          // If auto-selected book is mostly alternates, probe available books and keep
+          // the one with the highest number of main lines.
+          if (bestMainCount < 10 && candidates.length > 0) {
+            for (const bookmakerKey of candidates) {
+              const retryParams = new URLSearchParams(params);
+              retryParams.set("bookmaker", bookmakerKey);
+              const retryRes = await fetch(`${origin}/api/nba/odds?${retryParams.toString()}`, {
+                cache: "no-store",
+              });
+              if (!retryRes.ok) continue;
+              const retryOdds = (await retryRes.json()) as OddsPayload;
+              if (!retryOdds.ok || !Array.isArray(retryOdds.playerProps) || !retryOdds.playerProps.length) continue;
+              const retryMainCount = countMainProps(retryOdds);
+              if (retryMainCount > bestMainCount) {
+                best = retryOdds;
+                bestMainCount = retryMainCount;
+              }
+              if (bestMainCount >= 30) break;
+            }
+            odds = best;
+          }
+        }
+
+        const homeCode =
+          String(g.teams?.home?.code ?? "").trim().toUpperCase() ||
+          TEAM_CODE_BY_ID[Number(g.teams?.home?.id ?? 0)] ||
+          null;
+        const awayCode =
+          String(g.teams?.away?.code ?? "").trim().toUpperCase() ||
+          TEAM_CODE_BY_ID[Number(g.teams?.away?.id ?? 0)] ||
+          null;
         const homeTeamId = Number(g.teams?.home?.id ?? NaN);
         const awayTeamId = Number(g.teams?.away?.id ?? NaN);
         return {
@@ -622,32 +884,180 @@ export async function GET(req: NextRequest) {
       props: OddsProp[];
     }>;
     if (!slateProps.length) {
-      return NextResponse.json({
-        ok: true,
-        cached: false,
+      const payload: CachedTopPropsPayload = {
         generatedAt: new Date().toISOString(),
         date,
         season,
+        mode,
+        gameId: selectedGameId,
         events: games.length,
         propsAnalyzed: 0,
         props: [],
+      };
+      memoryCache.set(cacheKey, {
+        expiresAt: now + CACHE_TTL_MS,
+        payload,
+      });
+      if (!alternatesBestMode) {
+        await writeNbaTopPropsDailyCache({
+          dateKey: date,
+          gameId: selectedGameId,
+          timezone: QUERY_TIMEZONE,
+          season,
+          generatedAt: payload.generatedAt,
+          payload,
+          source: "computed",
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        cached: false,
+        mode,
+        ...payload,
       });
     }
 
     const aliases = seasonAliases(season);
     const players = await prisma.$queryRaw<PlayerRow[]>(
       Prisma.sql`
-        select player_id, full_name, team_id, team_code, position
+        select player_id, full_name, team_id, team_code, position, updated_at::text as updated_at
         from nba_players
         where season in (${Prisma.join(aliases.map((a) => Prisma.sql`${a}`))})
+        order by
+          full_name asc,
+          case
+            when team_code is null or btrim(team_code) = '' then 1
+            else 0
+          end asc,
+          updated_at desc nulls last
       `,
     );
-    const playerByName = new Map<string, PlayerRow>();
+    const playerCandidatesByName = new Map<string, PlayerRow[]>();
     for (const p of players) {
       const key = normalizeText(p.full_name);
-      if (!key || playerByName.has(key)) continue;
-      playerByName.set(key, p);
+      if (!key) continue;
+      const list = playerCandidatesByName.get(key) ?? [];
+      list.push(p);
+      playerCandidatesByName.set(key, list);
     }
+
+    const allCandidateIds = Array.from(
+      new Set(
+        players
+          .map((p) => Number(p.player_id ?? NaN))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      ),
+    );
+    const playerFreshnessById = new Map<number, { lastTs: number | null; games: number }>();
+    if (allCandidateIds.length) {
+      const freshnessRows = await prisma.$queryRaw<PlayerLogFreshnessRow[]>(
+        Prisma.sql`
+          select
+            player_id,
+            max(date)::text as last_date,
+            count(*)::int as games
+          from nba_player_game_logs
+          where player_id in (${Prisma.join(allCandidateIds.map((id) => Prisma.sql`${id}`))})
+            and season in (${Prisma.join(aliases.map((a) => Prisma.sql`${a}`))})
+            and coalesce(is_preseason, false) = false
+            and (status_short is null or status_short in (${Prisma.join(Array.from(FINISHED_STATUSES).map((s) => Prisma.sql`${s}`))}))
+          group by player_id
+        `,
+      );
+      for (const row of freshnessRows) {
+        const id = Number(row.player_id ?? NaN);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        const ts = Date.parse(String(row.last_date ?? ""));
+        playerFreshnessById.set(id, {
+          lastTs: Number.isFinite(ts) ? ts : null,
+          games: Number(row.games ?? 0) || 0,
+        });
+      }
+    }
+
+    const slateDateTs = Date.parse(`${date}T12:00:00Z`);
+    const referenceTs = Number.isFinite(slateDateTs) ? slateDateTs : Date.now();
+    const resolvePlayerKey = (gameId: number, playerName: string) =>
+      `${gameId}:${normalizeText(playerName)}`;
+    const resolvedPlayerByPropKey = new Map<string, PlayerRow>();
+    const resolvePlayerForProp = (
+      playerName: string,
+      pack: {
+        gameId: number;
+        homeCode: string | null;
+        awayCode: string | null;
+      },
+      prop: OddsProp,
+    ): PlayerRow | null => {
+      const key = normalizeText(playerName);
+      const candidates = playerCandidatesByName.get(key) ?? [];
+      if (!candidates.length) return null;
+
+      const gameCodes = new Set(
+        [pack.homeCode, pack.awayCode]
+          .filter(Boolean)
+          .map((code) => String(code).toUpperCase()),
+      );
+      const propTeamCode = String(prop.teamCode ?? "")
+        .trim()
+        .toUpperCase();
+      const propOppCode = String(prop.opponentCode ?? "")
+        .trim()
+        .toUpperCase();
+      if (propTeamCode) gameCodes.add(propTeamCode);
+      if (propOppCode) gameCodes.add(propOppCode);
+
+      const ranked = [...candidates].sort((a, b) => {
+        const rowTeamCode = (row: PlayerRow) => {
+          const byCode = String(row.team_code ?? "")
+            .trim()
+            .toUpperCase();
+          if (byCode) return byCode;
+          const byLegacyId = Number(row.team_id ?? NaN);
+          if (Number.isFinite(byLegacyId)) {
+            const mapped = TEAM_CODE_BY_ID[byLegacyId];
+            if (mapped) return mapped;
+          }
+          return null;
+        };
+
+        const aTeam = rowTeamCode(a);
+        const bTeam = rowTeamCode(b);
+        const aTeamMatch = aTeam ? gameCodes.has(aTeam) : false;
+        const bTeamMatch = bTeam ? gameCodes.has(bTeam) : false;
+        if (aTeamMatch !== bTeamMatch) return aTeamMatch ? -1 : 1;
+
+        const aFresh = playerFreshnessById.get(Number(a.player_id ?? NaN)) ?? null;
+        const bFresh = playerFreshnessById.get(Number(b.player_id ?? NaN)) ?? null;
+        const aAgeDays =
+          aFresh?.lastTs !== null && aFresh?.lastTs !== undefined
+            ? Math.floor((referenceTs - aFresh.lastTs) / (24 * 60 * 60 * 1000))
+            : null;
+        const bAgeDays =
+          bFresh?.lastTs !== null && bFresh?.lastTs !== undefined
+            ? Math.floor((referenceTs - bFresh.lastTs) / (24 * 60 * 60 * 1000))
+            : null;
+        const aRecent = aAgeDays !== null && aAgeDays <= MAX_PROP_LOG_AGE_DAYS;
+        const bRecent = bAgeDays !== null && bAgeDays <= MAX_PROP_LOG_AGE_DAYS;
+        if (aRecent !== bRecent) return aRecent ? -1 : 1;
+
+        const aLast = aFresh?.lastTs ?? 0;
+        const bLast = bFresh?.lastTs ?? 0;
+        if (aLast !== bLast) return bLast - aLast;
+
+        const aGames = Number(aFresh?.games ?? 0);
+        const bGames = Number(bFresh?.games ?? 0);
+        if (aGames !== bGames) return bGames - aGames;
+
+        const aUpdated = Date.parse(String(a.updated_at ?? ""));
+        const bUpdated = Date.parse(String(b.updated_at ?? ""));
+        const aUpdatedTs = Number.isFinite(aUpdated) ? aUpdated : 0;
+        const bUpdatedTs = Number.isFinite(bUpdated) ? bUpdated : 0;
+        return bUpdatedTs - aUpdatedTs;
+      });
+
+      return ranked[0] ?? null;
+    };
 
     const dvpRowsByPos = new Map<DvpPosition, DvpRow[]>();
     const dvpLeagueAvgByPos = new Map<DvpPosition, DvpStatTotals>();
@@ -743,7 +1153,16 @@ export async function GET(req: NextRequest) {
     const playerIds = new Set<number>();
     for (const pack of slateProps) {
       for (const prop of pack.props) {
-        const hit = playerByName.get(normalizeText(prop.name));
+        const resolutionKey = resolvePlayerKey(pack.gameId, prop.name);
+        const cached = resolvedPlayerByPropKey.get(resolutionKey);
+        const hit =
+          cached ??
+          resolvePlayerForProp(prop.name, {
+            gameId: pack.gameId,
+            homeCode: pack.homeCode,
+            awayCode: pack.awayCode,
+          }, prop);
+        if (hit) resolvedPlayerByPropKey.set(resolutionKey, hit);
         if (hit?.player_id) playerIds.add(hit.player_id);
       }
     }
@@ -770,7 +1189,9 @@ export async function GET(req: NextRequest) {
             minutes,
             field_goals_attempted,
             three_points_attempted,
-            free_throws_attempted
+            free_throws_attempted,
+            home_away::text,
+            result::text
           from nba_player_game_logs
           where player_id in (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
             and season in (${Prisma.join(aliases.map((a) => Prisma.sql`${a}`))})
@@ -791,20 +1212,30 @@ export async function GET(req: NextRequest) {
     for (const pack of slateProps) {
       for (let i = 0; i < pack.props.length; i += 1) {
         const prop = pack.props[i];
+        if (alternatesBestMode && prop.isAlternate !== true) continue;
+        if (!alternatesBestMode && prop.isAlternate === true) continue;
         const metric = metricFromRaw(prop.metric);
         if (!metric) continue;
         const trendMetric = trendMetricFromMetric(metric);
         if (!trendMetric) continue;
         const line = Number(prop.line);
-        if (!Number.isFinite(line) || line < minLineForMetric(metric)) continue;
+        if (!Number.isFinite(line) || line <= 0) continue;
 
-        // Best Props Nightly: OVER ONLY (pas de sélection under ici).
-        const overOdd = parseOdd(prop.overOdd ?? null);
-        if (overOdd === null) continue;
-        if (overOdd < 1.15 || overOdd > 4) continue;
-
-        const playerInfo = playerByName.get(normalizeText(prop.name));
+        const resolutionKey = resolvePlayerKey(pack.gameId, prop.name);
+        const playerInfo =
+          resolvedPlayerByPropKey.get(resolutionKey) ??
+          resolvePlayerForProp(
+            prop.name,
+            {
+              gameId: pack.gameId,
+              homeCode: pack.homeCode,
+              awayCode: pack.awayCode,
+            },
+            prop,
+          );
+        if (playerInfo) resolvedPlayerByPropKey.set(resolutionKey, playerInfo);
         if (!playerInfo?.player_id) continue;
+
         const orderedLogs = sortTrendLogs(logsByPlayer.get(playerInfo.player_id) ?? []);
         const regularSeasonStart = resolveRegularSeasonStart(season);
         const finishedStatuses = FINISHED_STATUSES;
@@ -829,25 +1260,24 @@ export async function GET(req: NextRequest) {
         const dedupedRegularLogs = dedupeLogsByGame(regularLogs);
         const usableLogs = dedupedRegularLogs.filter(isUsableTrendLog);
         const logs = (usableLogs.length ? usableLogs : dedupedRegularLogs).slice(0, 20);
-        if (logs.length < 5) continue;
+        if (!logs.length) continue;
 
-        const values = logs
+        const seasonValues = dedupedRegularLogs
           .map((row) => valueFromLog(row, metric))
-          .filter((v): v is number => Number.isFinite(v ?? NaN))
-          .slice(0, 10);
-        if (values.length < 5) continue;
+          .filter((v): v is number => Number.isFinite(v ?? NaN));
+        const recentValues = logs
+          .map((row) => valueFromLog(row, metric))
+          .filter((v): v is number => Number.isFinite(v ?? NaN));
+        const values = recentValues.slice(0, 10);
+        if (!values.length || !seasonValues.length) continue;
 
+        const valuesL5 = seasonValues.slice(0, 5);
+        const valuesL10 = seasonValues.slice(0, 10);
+        const valuesL20 = seasonValues.slice(0, 20);
         const mean = avg(values);
         const sd = stdDev(values);
         const cv = mean > 0 ? sd / mean : 1;
-
-        const overHit = pctHit(values, line, "over");
-        const impliedOver = 1 / overOdd;
-        const edgeOver = Number((overHit / 100 - impliedOver).toFixed(4));
-        const side = "over" as const;
-        const odd = overOdd;
-        const edge = edgeOver;
-        propsAnalyzed += 1;
+        const lineEdgeBase = line > 0 ? clamp(((mean - line) / line) * 40, -20, 20) : 0;
         const awayCode = pack.awayCode;
         const homeCode = pack.homeCode;
         const gameCodes = new Set(
@@ -961,10 +1391,6 @@ export async function GET(req: NextRequest) {
           opponentTeamId = TEAM_ID_BY_CODE[String(opponentCode).toUpperCase()];
         }
 
-        const noteHitPct = pctHit(values, line, "over");
-        const lineEdge = line > 0 ? clamp(((mean - line) / line) * 40, -20, 20) : 0;
-        const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 40, -20, 20);
-
         const dvpPosition = normalizeNbaDvpPosition(playerInfo.position);
         const dvpTotalTeams = dvpPosition ? (dvpTotalTeamsByPos.get(dvpPosition) ?? 0) : 0;
         const dvpMetricRank =
@@ -973,14 +1399,9 @@ export async function GET(req: NextRequest) {
                 `${dvpPosition}:${trendMetric}:${Number(opponentTeamId)}`,
               ) ?? null)
             : null;
-        const rankEdge =
-          dvpMetricRank && dvpTotalTeams > 1
-            ? clamp(
-                ((dvpMetricRank - (dvpTotalTeams + 1) / 2) / ((dvpTotalTeams - 1) / 2)) * 20,
-                -20,
-                20,
-              )
-            : 0;
+        const dvpScoreBase = dvpScoreFromRank(dvpMetricRank);
+        // Même courbe en paliers que dvpScoreFromRank, scalée à ±20 pour le rawScore
+        const rankEdgeBase = dvpScoreBase * 2;
 
         const dvpRow =
           dvpPosition && Number.isFinite(Number(opponentTeamId ?? NaN))
@@ -1008,7 +1429,7 @@ export async function GET(req: NextRequest) {
               : dvpMetricDelta <= -0.07
                 ? "strength"
                 : "neutral";
-        const strengthEdge =
+        const strengthEdgeBase =
           dvpMetricFlag === "weakness" ? 8 : dvpMetricFlag === "strength" ? -8 : 0;
 
         const h2hValues = opponentCode
@@ -1026,63 +1447,112 @@ export async function GET(req: NextRequest) {
         const matchupBase = (h2hValues.length ? h2hValues : values.slice(0, 5)).filter((v) =>
           Number.isFinite(v),
         );
-        const matchupPct = pctHit(matchupBase, line, "over");
-        const h2hEdge = clamp(((matchupPct / 100) - 0.5) * 20, -6, 6);
-
         const consistencyEdge = clamp((0.35 - cv) * 20, -6, 6);
+        const consistencyScore = consistencyScoreFromCv(cv);
         const sampleEdge = values.length < 5 ? clamp((values.length - 5) * 2, -6, 0) : 0;
 
-        const edgePct = edge * 100;
-        const edgeSignal = clamp(edgePct * 1.6, -18, 18);
-        const lowHitPenalty = noteHitPct < 58 ? -((58 - noteHitPct) * 1.25) : 0;
-
-        const score = Math.round(
-          clamp(
-            40 +
-              lineEdge * 0.75 +
-              hitEdge * 1.1 +
-              rankEdge * 0.55 +
-              strengthEdge * 0.65 +
-              h2hEdge * 0.7 +
-              consistencyEdge +
-              sampleEdge +
-              edgeSignal +
-              lowHitPenalty,
-            0,
-            100,
-          ),
-        );
-
-        const grade = gradeFromSignals({
-          score,
-          hitPct: noteHitPct,
-          edgePct,
-          sampleSize: values.length,
-          cv,
-        });
-
-        const pick: TopProp = {
-          id: `${pack.gameId}-${i}`,
-          playerId: playerInfo.player_id,
-          player: prop.name,
-          teamCode,
-          opponentCode,
-          metric,
-          side,
+        // ── Nouveaux signaux ─────────────────────────────────────────────────
+        const isHomeTonight = Boolean(teamCode && homeCode && teamCode === homeCode);
+        const restDaysEdgeVal = computeRestDaysEdge(logs[0]?.date ?? null, date);
+        const splitEdgeVal = computeSplitEdge(
+          dedupedRegularLogs,
+          (row) => valueFromLog(row as LogRow, metric),
+          isHomeTonight,
           line,
-          odds: odd,
-          edge: Number(edgePct.toFixed(1)),
-          score,
-          grade,
-          finalScore: score,
-          gameId: pack.gameId,
-          bookmaker: prop.bookmakerName ?? null,
-        };
-
+        );
         const gameKey = Number(pack.gameId ?? NaN);
         if (!Number.isFinite(gameKey)) continue;
+        const buildPickForSide = (side: "over" | "under", odd: number | null): TopProp | null => {
+          if (odd === null) return null;
+          if (odd < 1.15 || odd > 4) return null;
+
+          const sideMultiplier = side === "over" ? 1 : -1;
+          const hitRateL5 = valuesL5.length ? pctHit(valuesL5, line, side) : 0;
+          const hitRateL10 = valuesL10.length ? pctHit(valuesL10, line, side) : 0;
+          const hitRateL20 = valuesL20.length ? pctHit(valuesL20, line, side) : 0;
+          const seasonHitRate = pctHit(seasonValues, line, side);
+          const weightedHitRate = weightedAverage([
+            { value: hitRateL10, weight: 0.5, enabled: valuesL10.length > 0 },
+            { value: hitRateL20, weight: 0.3, enabled: valuesL20.length > 0 },
+            { value: seasonHitRate, weight: 0.2, enabled: seasonValues.length > 0 },
+          ]);
+          const noteHitPct = pctHit(values, line, side);
+          const implied = 1 / odd;
+          const edge = Number((noteHitPct / 100 - implied).toFixed(4));
+          const impliedProbabilityPct = implied * 100;
+          const modelEdgePct = weightedHitRate - impliedProbabilityPct;
+          const americanOdds = decimalToAmericanOdds(odd);
+          const lineEdge = lineEdgeBase * sideMultiplier;
+          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 40, -20, 20);
+          const rankEdge = rankEdgeBase * sideMultiplier;
+          const strengthEdge = strengthEdgeBase * sideMultiplier;
+          const matchupPct = pctHit(matchupBase, line, side);
+          const h2hEdge = clamp(((matchupPct / 100) - 0.5) * 20, -6, 6);
+          const recommendationTag = recommendationTagFromSignals(weightedHitRate, americanOdds);
+          const edgePct = edge * 100;
+          const rawScore =
+            50 +
+            lineEdge +
+            hitEdge +
+            rankEdge +
+            strengthEdge +
+            h2hEdge +
+            consistencyEdge +
+            sampleEdge +
+            restDaysEdgeVal * sideMultiplier +
+            splitEdgeVal * sideMultiplier;
+          const score = Math.round(clamp(rawScore, 0, 100));
+          const grade = gradeFromSignals({
+            score,
+            hitPct: noteHitPct,
+            sampleSize: values.length,
+            cv,
+          });
+
+          propsAnalyzed += 1;
+          return {
+            id: `${pack.gameId}-${i}-${side}`,
+            playerId: playerInfo.player_id,
+            player: prop.name,
+            teamCode,
+            opponentCode,
+            metric,
+            side,
+            line,
+            odds: odd,
+            edge: Number(edgePct.toFixed(1)),
+            hitRate: Number(weightedHitRate.toFixed(1)),
+            hitRateL5: Number(hitRateL5.toFixed(1)),
+            hitRateL10: Number(hitRateL10.toFixed(1)),
+            hitRateL20: Number(hitRateL20.toFixed(1)),
+            seasonHitRate: Number(seasonHitRate.toFixed(1)),
+            impliedProbability: Number(impliedProbabilityPct.toFixed(1)),
+            modelEdge: Number(modelEdgePct.toFixed(1)),
+            dvpScore: dvpScoreBase * sideMultiplier,
+            dvpRank: dvpMetricRank ?? null,
+            dvpTotalTeams: dvpTotalTeams || null,
+            dvpValue: dvpValue !== null ? Number(dvpValue.toFixed(1)) : null,
+            dvpMetricFlag: dvpMetricFlag ?? null,
+            dvpPosition: dvpPosition ?? null,
+            consistencyScore,
+            recommendationTag,
+            restDaysEdge: Number(restDaysEdgeVal.toFixed(1)),
+            splitEdge: Number(splitEdgeVal.toFixed(1)),
+            score,
+            grade,
+            finalScore: score,
+            gameId: pack.gameId,
+            bookmaker: prop.bookmakerName ?? null,
+          };
+        };
+
+        const picksForProp = [
+          buildPickForSide("over", parseOdd(prop.overOdd ?? null)),
+          buildPickForSide("under", parseOdd(prop.underOdd ?? null)),
+        ].filter((pick): pick is TopProp => Boolean(pick));
+        if (!picksForProp.length) continue;
         const list = picksByGame.get(gameKey) ?? [];
-        list.push(pick);
+        list.push(...picksForProp);
         picksByGame.set(gameKey, list);
       }
     }
@@ -1091,10 +1561,12 @@ export async function GET(req: NextRequest) {
       if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
       return b.edge - a.edge;
     };
+    const sortAlternates = sortProps;
     const dedupeByPlayerMetric = (picks: TopProp[]) => {
       const best = new Map<string, TopProp>();
       for (const pick of picks) {
-        const key = `${normalizeText(pick.player)}::${String(pick.metric).toUpperCase()}`;
+        const key =
+          `${normalizeText(pick.player)}::${String(pick.metric).toUpperCase()}::${pick.side}`;
         const existing = best.get(key);
         if (
           !existing ||
@@ -1105,6 +1577,39 @@ export async function GET(req: NextRequest) {
         }
       }
       return Array.from(best.values());
+    };
+    const pickBestAlternatesByPlayerMetric = (picks: TopProp[], maxPerGroup = 3) => {
+      const groups = new Map<string, TopProp[]>();
+      for (const pick of picks) {
+        const key = `${normalizeText(pick.player)}::${String(pick.metric).toUpperCase()}`;
+        const list = groups.get(key) ?? [];
+        list.push(pick);
+        groups.set(key, list);
+      }
+
+      const output: TopProp[] = [];
+      for (const group of groups.values()) {
+        const sorted = [...group].sort(sortAlternates);
+        const selected: TopProp[] = [];
+        const seenTags = new Set<string>();
+        for (const pick of sorted) {
+          if (selected.length >= maxPerGroup) break;
+          const tag = pick.recommendationTag ?? "";
+          if (tag && seenTags.has(tag)) continue;
+          selected.push(pick);
+          if (tag) seenTags.add(tag);
+        }
+        for (const pick of sorted) {
+          if (selected.length >= maxPerGroup) break;
+          const already = selected.some(
+            (item) => item.side === pick.side && Number(item.line) === Number(pick.line),
+          );
+          if (already) continue;
+          selected.push(pick);
+        }
+        output.push(...selected);
+      }
+      return output;
     };
     const enforceGradeCapsPerGame = (picks: TopProp[]) => {
       let aPlusCount = 0;
@@ -1119,24 +1624,39 @@ export async function GET(req: NextRequest) {
     };
 
     const props =
-      selectedGameId !== null
-        ? enforceGradeCapsPerGame(
-            dedupeByPlayerMetric([...(picksByGame.get(selectedGameId) ?? [])])
-              .sort(sortProps)
-              .slice(0, 10),
+      alternatesBestMode
+        ? (
+            selectedGameId !== null
+              ? pickBestAlternatesByPlayerMetric(
+                  [...(picksByGame.get(selectedGameId) ?? [])],
+                  3,
+                )
+              : Array.from(picksByGame.entries())
+                  .sort((a, b) => a[0] - b[0])
+                  .flatMap(([, picks]) =>
+                    pickBestAlternatesByPlayerMetric([...picks], 3),
+                  )
           )
-        : Array.from(picksByGame.entries())
-            .sort((a, b) => a[0] - b[0])
-            .flatMap(([, picks]) =>
-              enforceGradeCapsPerGame(
-                dedupeByPlayerMetric([...picks]).sort(sortProps).slice(0, 10),
-              ),
-            );
+            .sort(sortAlternates)
+            .slice(0, alternatesLimit)
+        : selectedGameId !== null
+          ? enforceGradeCapsPerGame(
+              dedupeByPlayerMetric([...(picksByGame.get(selectedGameId) ?? [])])
+                .sort(sortProps),
+            )
+          : Array.from(picksByGame.entries())
+              .sort((a, b) => a[0] - b[0])
+              .flatMap(([, picks]) =>
+                enforceGradeCapsPerGame(
+                  dedupeByPlayerMetric([...picks]).sort(sortProps),
+                ),
+              );
 
-    const payload = {
+    const payload: CachedTopPropsPayload = {
       generatedAt: new Date().toISOString(),
       date,
       season,
+      mode,
       gameId: selectedGameId,
       events: games.length,
       propsAnalyzed,
@@ -1146,7 +1666,18 @@ export async function GET(req: NextRequest) {
       expiresAt: now + CACHE_TTL_MS,
       payload,
     });
-    return NextResponse.json({ ok: true, cached: false, ...payload });
+    if (!alternatesBestMode) {
+      await writeNbaTopPropsDailyCache({
+        dateKey: date,
+        gameId: selectedGameId,
+        timezone: QUERY_TIMEZONE,
+        season,
+        generatedAt: payload.generatedAt,
+        payload,
+        source: "computed",
+      });
+    }
+    return NextResponse.json({ ok: true, cached: false, mode, ...payload });
   } catch (err) {
     return NextResponse.json(
       {

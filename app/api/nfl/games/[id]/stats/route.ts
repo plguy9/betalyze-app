@@ -6,13 +6,9 @@ const API_BASE = process.env.APISPORTS_NFL_URL ?? "https://v1.american-football.
 
 export async function GET(
   req: NextRequest,
-  { params }: { params?: { id?: string | string[] } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const rawIdParam = Array.isArray(params?.id) ? params?.id[0] : params?.id;
-  const segments = req.nextUrl.pathname.split("/").filter(Boolean);
-  const idx = segments.findIndex((s) => s === "games");
-  const rawIdPath = idx >= 0 ? segments[idx + 1] : null;
-  const rawId = rawIdParam ?? rawIdPath;
+  const { id: rawId } = await params;
   const gameId = Number(rawId);
 
   if (!Number.isFinite(gameId)) {

@@ -118,7 +118,7 @@ export default function PlayerPreviewPage() {
 
   const seasonParam = searchParams?.get("season");
   const defaultSeason =
-    process.env.NEXT_PUBLIC_APISPORTS_BASKETBALL_SEASON ?? "2025-2026";
+    process.env.NEXT_PUBLIC_APISPORTS_NBA_SEASON ?? "2025";
   const season = seasonParam || defaultSeason;
 
   useEffect(() => {

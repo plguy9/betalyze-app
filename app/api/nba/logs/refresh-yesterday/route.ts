@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeNbaSeasonLabel } from "@/lib/nba/players-db";
 
-export const maxDuration = 900;
+export const maxDuration = 300;
 
 const DEFAULT_SEASON = normalizeNbaSeasonLabel(
   process.env.APISPORTS_NBA_SEASON ?? "2025",

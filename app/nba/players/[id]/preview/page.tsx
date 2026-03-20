@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import playersData from "@/data/nba-players-nba-v2-2025.json";
 
 type NbaPlayer = {
   id?: number | string;
@@ -69,45 +68,16 @@ type PlayersApiPayload = {
   player?: NbaPlayer | null;
 };
 
-const rawPlayers: any = playersData;
-const localPlayers: NbaPlayer[] = Array.isArray(rawPlayers)
-  ? rawPlayers
-  : Array.isArray(rawPlayers.players)
-  ? rawPlayers.players
-  : Array.isArray(rawPlayers.response)
-  ? rawPlayers.response
-  : [];
-
-const localById = (() => {
-  const m = new Map<string, NbaPlayer>();
-  for (const p of localPlayers) {
-    const ids = [
-      p.id,
-      (p as any).playerId,
-      (p as any).player_id,
-      (p as any).player?.id,
-    ]
-      .filter((v) => v !== undefined && v !== null)
-      .map((v) => String(v));
-    ids.forEach((id) => {
-      if (!m.has(id)) m.set(id, p);
-    });
-  }
-  return m;
-})();
-
-function findLocalPlayer(id: string | null): NbaPlayer | null {
-  if (!id) return null;
-  const direct = id.trim();
-  const num = Number.isFinite(Number(id)) ? String(Number(id)) : null;
-  return localById.get(direct) ?? (num ? localById.get(num) ?? null : null);
-}
 
 function formatName(p: NbaPlayer): string {
   const fromParts = [p.firstName, p.lastName].filter(Boolean).join(" ").trim();
   if (fromParts) return fromParts;
   if (p.fullName) return p.fullName;
   return `Player #${p.id}`;
+}
+
+function normalizeSearchInput(value: string): string {
+  return value.replace(/[-_]+/g, " ").trim();
 }
 
 function safeNum(n: number | null | undefined, digits = 1): string {
@@ -147,7 +117,8 @@ export default function PlayerPreviewPage() {
   }, [params]);
 
   const seasonParam = searchParams?.get("season");
-  const defaultSeason = process.env.NEXT_PUBLIC_APISPORTS_BASKETBALL_SEASON ?? "2025";
+  const defaultSeason =
+    process.env.NEXT_PUBLIC_APISPORTS_NBA_SEASON ?? "2025";
   const season = seasonParam || defaultSeason;
 
   useEffect(() => {
@@ -161,6 +132,7 @@ export default function PlayerPreviewPage() {
       setLoading(true);
       setError(null);
       let found: NbaPlayer | null = null;
+      let resolvedPlayerId: string | null = null;
       try {
         const res = await fetch(`/api/nba/players?id=${resolvedId}`, {
           signal: controller.signal,
@@ -175,12 +147,38 @@ export default function PlayerPreviewPage() {
             ? [data.player]
             : [];
           found = arr[0] ?? null;
+          if (found?.id !== undefined && found?.id !== null) {
+            resolvedPlayerId = String(found.id);
+          }
         }
       } catch {
         // ignore
       }
-      if (!found) {
-        found = findLocalPlayer(resolvedId);
+      if (!found && resolvedId) {
+        const cleaned = normalizeSearchInput(resolvedId);
+        const isNumeric = Number.isFinite(Number(cleaned));
+        if (cleaned && !isNumeric) {
+          try {
+            const res = await fetch(
+              `/api/nba/players?search=${encodeURIComponent(cleaned)}`,
+              { signal: controller.signal },
+            );
+            if (res.ok) {
+              const data = (await res.json()) as PlayersApiPayload;
+              const arr = Array.isArray(data.players)
+                ? data.players
+                : Array.isArray(data.response)
+                ? data.response
+                : [];
+              found = arr[0] ?? null;
+              if (found?.id !== undefined && found?.id !== null) {
+                resolvedPlayerId = String(found.id);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
       }
       if (!found) {
         setError("Joueur introuvable");
@@ -190,8 +188,9 @@ export default function PlayerPreviewPage() {
       setPlayer(found);
 
       try {
+        const playerId = resolvedPlayerId ?? resolvedId;
         const res = await fetch(
-          `/api/nba/players/${resolvedId}/summary?season=${encodeURIComponent(
+          `/api/nba/players/${playerId}/summary?season=${encodeURIComponent(
             season,
           )}&refresh=1`,
           {

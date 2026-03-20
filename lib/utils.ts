@@ -1,7 +1,6 @@
-// lib/utils.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
-// Petit utilitaire maison pour fusionner des classes CSS.
-// Pas besoin de clsx / tailwind-merge.
-export function cn(...inputs: Array<string | undefined | null | false>) {
-  return inputs.filter(Boolean).join(" ");
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }

@@ -1,5 +1,6 @@
 // app/api/nfl/players/[id]/logs/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const API_KEY = process.env.APISPORTS_KEY;
 const API_BASE =
@@ -71,6 +72,25 @@ function normalizeGameDate(game: any): string {
 
 function normalizeLabel(label: string) {
   return label.toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+
+async function fetchGamesWithParams(
+  baseUrl: URL,
+  params: Record<string, string>,
+  apiKey: string,
+) {
+  const url = new URL(baseUrl.toString());
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  const res = await fetch(url.toString(), {
+    headers: { "x-apisports-key": apiKey },
+    cache: "no-store",
+  }).catch(() => null as any);
+  if (!res?.ok) return [];
+  const json = await res.json().catch(() => null);
+  if (!json || (json.errors && Object.keys(json.errors).length > 0)) return [];
+  return Array.isArray(json?.response) ? json.response : [];
 }
 
 function collectPlayerGroupStats(statsResp: any[], playerId: number) {
@@ -188,10 +208,38 @@ export async function GET(
   if (!API_KEY) {
     return NextResponse.json({ error: "Missing API key" }, { status: 500 });
   }
-  // Si team absent, on tente de le déduire via /players/statistics. Si toujours rien, fallback Bills=20.
+  // Priorite: team du roster en DB -> inference API -> fallback Bills=20.
   if (!teamIdParam) {
-    const inferred = await resolveTeamId(playerId, season, league);
-    teamIdParam = String(inferred ?? 20); // fallback Bills=20
+    let rosterTeamId: number | null = null;
+    try {
+      const roster = await prisma.player.findUnique({
+        where: {
+          sport_externalId: {
+            sport: "nfl",
+            externalId: String(playerId),
+          },
+        },
+        select: {
+          team: {
+            select: {
+              externalId: true,
+            },
+          },
+        },
+      });
+      const parsed = Number(roster?.team?.externalId);
+      rosterTeamId = Number.isFinite(parsed) ? parsed : null;
+    } catch (err) {
+      console.warn("NFL logs roster lookup failed:", err);
+      rosterTeamId = null;
+    }
+
+    if (rosterTeamId !== null) {
+      teamIdParam = String(rosterTeamId);
+    } else {
+      const inferred = await resolveTeamId(playerId, season, league);
+      teamIdParam = String(inferred ?? 20); // fallback Bills=20
+    }
   }
 
   const teamId = Number(teamIdParam);
@@ -225,12 +273,71 @@ export async function GET(
       );
     }
     const gamesJson = await gamesRes.json();
-    const games = Array.isArray(gamesJson?.response) ? gamesJson.response : [];
+    const gamesBase = Array.isArray(gamesJson?.response) ? gamesJson.response : [];
+
+    const hasPlayoffStage = gamesBase.some((g) => {
+      const stageRaw = g?.game?.stage ?? g?.stage ?? "";
+      const stage = String(stageRaw).toLowerCase();
+      return (
+        stage.includes("playoff") ||
+        stage.includes("postseason") ||
+        stage.includes("post season") ||
+        stage.includes("wild card") ||
+        stage.includes("divisional") ||
+        stage.includes("conference") ||
+        stage.includes("championship") ||
+        stage.includes("super bowl")
+      );
+    });
+
+    const extraStages = hasPlayoffStage
+      ? []
+      : ["Playoffs", "Post Season", "Postseason"];
+    const gamesExtras: any[] = [];
+    for (const stage of extraStages) {
+      const extra = await fetchGamesWithParams(
+        gamesUrl,
+        { league, season, team: String(teamId), stage },
+        API_KEY,
+      );
+      if (extra.length > 0) {
+        gamesExtras.push(
+          ...extra.map((g: any) => ({
+            ...g,
+            __forcedStage: "playoffs",
+          })),
+        );
+      }
+    }
+
+    const gamesById = new Map<number, any>();
+    for (const g of [...gamesBase, ...gamesExtras]) {
+      const id = Number(g?.id ?? g?.game?.id);
+      if (!Number.isFinite(id)) continue;
+      if (!gamesById.has(id)) gamesById.set(id, g);
+    }
+    const games = Array.from(gamesById.values());
 
     const regularSeasonGames = games.filter((g) => {
       const stageRaw = g?.game?.stage ?? g?.stage ?? "";
+      const forcedStage = String(g?.__forcedStage ?? "");
       const stage = String(stageRaw).toLowerCase();
-      if (stage && stage !== "regular season") return false;
+      const isPreseason =
+        stage.includes("preseason") || stage.includes("pre season") || stage.includes("exhibition");
+      const isRegular =
+        stage.includes("regular") || stage.includes("reg. season") || stage.includes("regular season");
+      const isPlayoffs =
+        stage.includes("playoff") ||
+        stage.includes("postseason") ||
+        stage.includes("post season") ||
+        stage.includes("wild card") ||
+        stage.includes("divisional") ||
+        stage.includes("conference") ||
+        stage.includes("championship") ||
+        stage.includes("super bowl") ||
+        forcedStage.toLowerCase() === "playoffs";
+      if (isPreseason) return false;
+      if (stage && !(isRegular || isPlayoffs)) return false;
       const homeScore = g?.scores?.home?.total ?? g?.game?.scores?.home?.total;
       const awayScore = g?.scores?.away?.total ?? g?.game?.scores?.away?.total;
       return homeScore !== null && homeScore !== undefined && awayScore !== null && awayScore !== undefined;
@@ -249,6 +356,20 @@ export async function GET(
     for (const g of selectedGames) {
       const gameId = g?.id ?? g?.game?.id;
       if (!gameId) continue;
+
+      const stageRaw = g?.game?.stage ?? g?.stage ?? "";
+      const forcedStage = String(g?.__forcedStage ?? "");
+      const stage = String(stageRaw).toLowerCase();
+      const isPlayoffs =
+        stage.includes("playoff") ||
+        stage.includes("postseason") ||
+        stage.includes("post season") ||
+        stage.includes("wild card") ||
+        stage.includes("divisional") ||
+        stage.includes("conference") ||
+        stage.includes("championship") ||
+        stage.includes("super bowl") ||
+        forcedStage.toLowerCase() === "playoffs";
 
       const statsUrl = new URL("/games/statistics/players", API_BASE);
       statsUrl.searchParams.set("id", String(gameId));
@@ -392,6 +513,8 @@ export async function GET(
       logs.push({
         week: g?.week?.current ?? g?.week ?? g?.game?.week ?? logs.length + 1,
         date: normalizeGameDate(g),
+        stageType: isPlayoffs ? "playoffs" : "regular",
+        stageLabel: stageRaw ? String(stageRaw) : forcedStage ? "Playoffs" : null,
         homeAway: isHome ? "vs" : "@",
         opp: oppTeam,
         result,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -18,18 +19,19 @@ if (hasEnvFile && typeof process.loadEnvFile === 'function') {
 const checks = [
   { key: 'DATABASE_URL', required: true, note: 'Prisma / base SQLite' },
   { key: 'APISPORTS_KEY', required: true, note: 'Cle API-Sports commune (NBA/NFL)' },
-  { key: 'APISPORTS_BASKETBALL_URL', required: false, note: 'Base API basket (v1)' },
-  { key: 'APISPORTS_BASKETBALL_SEASON', required: false, note: 'Saison basket ex: 2024-2025' },
-  { key: 'APISPORTS_BASKETBALL_LEAGUE_ID', required: false, note: 'League ID basket' },
   { key: 'APISPORTS_NBA_URL', required: false, note: 'Base API NBA v2' },
-  { key: 'APISPORTS_NBA_SEASON', required: false, note: 'Saison NBA v2 ex: 2025-2026' },
+  { key: 'APISPORTS_NBA_SEASON', required: false, note: 'Saison NBA v2 ex: 2025' },
   { key: 'APISPORTS_NBA_LEAGUE_ID', required: false, note: 'League ID NBA v2' },
   { key: 'APISPORTS_NFL_URL', required: false, note: 'Base API NFL' },
   { key: 'APISPORTS_NFL_LEAGUE_ID', required: false, note: 'League ID NFL (defaut 1)' },
   { key: 'APISPORTS_NFL_SEASON', required: false, note: 'Saison NFL (2024/2025)' },
-  { key: 'NEXT_PUBLIC_APISPORTS_BASKETBALL_SEASON', required: false, note: 'Saison exposee au front' },
+  { key: 'NEXT_PUBLIC_APISPORTS_NBA_SEASON', required: false, note: 'Saison exposee au front' },
   { key: 'THE_ODDS_API_KEY', required: false, note: 'Cle The Odds API (props joueurs)' },
+  { key: 'SPORTSGAMEODDS_API_KEY', required: false, note: 'Cle SportsGameOdds (props NBA)' },
+  { key: 'SPORTSGAMEODDS_API_URL', required: false, note: 'Base API SportsGameOdds' },
   { key: 'NHL_API_URL', required: false, note: 'Base API NHL' },
+  { key: 'SUPABASE_URL', required: false, note: 'URL Supabase (cache logs NBA)' },
+  { key: 'SUPABASE_SERVICE_ROLE_KEY', required: false, note: 'Service role Supabase (cache logs NBA)' },
 ];
 
 const results = checks.map((item) => {

@@ -6,10 +6,6 @@ const API_BASE = process.env.APISPORTS_NFL_URL ?? "https://v1.american-football.
 const DEFAULT_LEAGUE = process.env.APISPORTS_NFL_LEAGUE_ID ?? "1";
 const DEFAULT_SEASON = "2025";
 
-function sanitizeId(raw: string | string[] | null | undefined) {
-  if (Array.isArray(raw)) return raw[0];
-  return raw ?? null;
-}
 
 function isFinishedGame(game: any, includePreseason: boolean): boolean {
   const status =
@@ -28,13 +24,9 @@ function toNumber(val: any): number | null {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params?: { id?: string | string[] } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const rawIdParam = sanitizeId(params?.id);
-  const segments = req.nextUrl.pathname.split("/").filter(Boolean);
-  const idx = segments.findIndex((s) => s === "teams");
-  const rawIdPath = idx >= 0 ? segments[idx + 1] : null;
-  const rawId = rawIdParam ?? rawIdPath;
+  const { id: rawId } = await params;
   const teamId = Number(rawId);
 
   if (!Number.isFinite(teamId)) {

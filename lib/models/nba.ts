@@ -33,6 +33,7 @@ export interface NbaPlayer {
   position: NbaPosition;// "F", "G", "C", "G-F", etc.
 
   jerseyNumber?: number | null;
+  age?: number | null;
   height?: string | null;  // ex: "6-9"
   weight?: string | null;  // ex: "250 lbs"
   nationality?: string | null;
@@ -111,8 +112,13 @@ export interface NbaPlayerGameStats {
   // Volume de tirs
   fieldGoalsMade: number | null;     // FGM
   fieldGoalsAttempted: number | null;// FGA
+  fieldGoalPct?: number | null;
   threePointsMade: number | null;    // 3PM
   threePointsAttempted: number | null;// 3PA
+  threePointPct?: number | null;
+  freeThrowsMade?: number | null;    // FTM
+  freeThrowsAttempted?: number | null;// FTA
+  freeThrowPct?: number | null;
 
   // Contrôle / erreurs
   turnovers: number | null;

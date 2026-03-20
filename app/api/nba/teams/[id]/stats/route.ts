@@ -2,14 +2,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.APISPORTS_NBA_URL ||
-  process.env.APISPORTS_BASKETBALL_URL ||
-  "https://v2.nba.api-sports.io";
+  process.env.APISPORTS_NBA_URL || "https://v2.nba.api-sports.io";
 const API_KEY = process.env.APISPORTS_KEY;
 const DEFAULT_SEASON =
-  process.env.APISPORTS_NBA_SEASON ??
-  process.env.APISPORTS_BASKETBALL_SEASON ??
-  "2025";
+  process.env.APISPORTS_NBA_SEASON ?? "2025";
 
 // Correspondance codes -> IDs NBA v2 (https://v2.nba.api-sports.io)
 const V2_TEAM_ID_BY_CODE: Record<string, number> = {
@@ -85,17 +81,23 @@ function resolveV2TeamId(teamId: number) {
   return V2_TEAM_ID_BY_CODE[code] ?? teamId;
 }
 
+function resolveTeamIdForApi(teamId: number) {
+  return resolveV2TeamId(teamId);
+}
+
+function normalizeSeason(value: string): string {
+  const match = value.match(/(\d{4})/);
+  if (!match) return value;
+  const year = Number(match[1]);
+  if (!Number.isFinite(year)) return value;
+  return String(year);
+}
+
 export async function GET(
   req: NextRequest,
-  { params }: { params?: { id?: string | string[] } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  // Next devrait passer params, mais on garde un fallback basé sur l'URL
-  const rawIdFromParams = Array.isArray(params?.id) ? params?.id[0] : params?.id;
-  const url = new URL(req.url);
-  const segments = url.pathname.split("/").filter(Boolean); // api, nba, teams, {id}, stats
-  const idx = segments.findIndex((s) => s === "teams");
-  const rawIdFromPath = idx >= 0 ? segments[idx + 1] : null;
-  const rawId = rawIdFromParams ?? rawIdFromPath;
+  const { id: rawId } = await params;
 
   const teamId = Number(rawId);
   if (!Number.isFinite(teamId)) {
@@ -105,7 +107,8 @@ export async function GET(
     );
   }
 
-  const season = DEFAULT_SEASON;
+  const seasonParam = req.nextUrl.searchParams.get("season") ?? DEFAULT_SEASON;
+  const season = normalizeSeason(seasonParam);
   if (!API_KEY) {
     return NextResponse.json(
       { error: "Missing API key", response: null },
@@ -114,9 +117,10 @@ export async function GET(
   }
 
   try {
-    const v2Id = resolveV2TeamId(teamId);
+    const teamIdForApi = resolveTeamIdForApi(teamId);
+
     const url = new URL("/teams/statistics", API_BASE);
-    url.searchParams.set("id", String(v2Id));
+    url.searchParams.set("id", String(teamIdForApi));
     url.searchParams.set("season", String(season));
 
     const res = await fetch(url.toString(), {

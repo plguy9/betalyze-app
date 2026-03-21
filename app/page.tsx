@@ -354,29 +354,28 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right — arena with floating cards */}
-          <div className="relative flex shrink-0 items-center justify-center md:w-[520px] lg:w-[600px]">
+          {/* Right — arena with floating cards (desktop only) */}
+          <div className="relative hidden shrink-0 items-center justify-center md:flex md:w-[520px] lg:w-[600px]">
 
             {/* Glow behind arena */}
             <div className="anim-orb pointer-events-none absolute inset-0"
               style={{ background: "radial-gradient(ellipse at 55% 55%, rgba(255,138,0,.20) 0%, rgba(25,199,195,.10) 50%, transparent 72%)", filter: "blur(32px)", animationDelay: ".8s" }} />
 
             {/* Floating card — BZ Score (top-left) */}
-            <div className="anim-float absolute -left-4 top-10 z-10 rounded-2xl border px-4 py-3 shadow-2xl md:-left-8"
+            <div className="anim-float absolute -left-8 top-10 z-10 rounded-2xl border px-4 py-3 shadow-2xl"
               style={{ background: "rgba(8,8,14,.82)", borderColor: "rgba(255,138,0,.35)", backdropFilter: "blur(16px)", animationDelay: "0s" }}>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: B.muted }}>Betalyze Score</p>
               <div className="flex items-end gap-2">
                 <span className="text-3xl font-black" style={{ color: B.orange2 }}>94</span>
                 <span className="mb-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-400/30">A+</span>
               </div>
-              {/* mini bar */}
               <div className="mt-2 h-1 w-24 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,.08)" }}>
                 <div className="h-full rounded-full" style={{ width: "94%", background: "linear-gradient(90deg,#ff8a00,#ffb14a)" }} />
               </div>
             </div>
 
             {/* Floating card — Hit rate (right) */}
-            <div className="anim-float-sm absolute -right-2 top-1/3 z-10 rounded-2xl border px-3 py-2.5 shadow-2xl md:-right-6"
+            <div className="anim-float-sm absolute -right-6 top-1/3 z-10 rounded-2xl border px-3 py-2.5 shadow-2xl"
               style={{ background: "rgba(8,8,14,.82)", borderColor: "rgba(25,199,195,.30)", backdropFilter: "blur(16px)", animationDelay: "1.5s" }}>
               <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: B.muted }}>L10 Hit Rate</p>
               <p className="mt-0.5 text-xl font-black" style={{ color: B.teal }}>8 / 10</p>
@@ -384,7 +383,7 @@ export default function Home() {
             </div>
 
             {/* Floating card — Live badge (bottom) */}
-            <div className="anim-float absolute bottom-10 left-4 z-10 flex items-center gap-2 rounded-full border px-3 py-2 shadow-xl md:left-0"
+            <div className="anim-float absolute bottom-10 left-0 z-10 flex items-center gap-2 rounded-full border px-3 py-2 shadow-xl"
               style={{ background: "rgba(8,8,14,.82)", borderColor: "rgba(255,255,255,.10)", backdropFilter: "blur(16px)", animationDelay: "3s" }}>
               <span className="relative flex h-2 w-2">
                 <span className="anim-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400" />
@@ -402,7 +401,7 @@ export default function Home() {
       </section>
 
       {/* transition hero → ticker */}
-      <div className="h-24 w-full md:h-32" style={{ background: "linear-gradient(to bottom, transparent, #030305)" }} />
+      <div className="h-10 w-full md:h-24" style={{ background: "linear-gradient(to bottom, transparent, #030305)" }} />
 
       {/* ── Stats ticker — full width ──────────────────────────────────── */}
       <div className="w-full" style={{ background: "#030305" }}>
@@ -429,10 +428,10 @@ export default function Home() {
       </div>
 
       {/* transition ticker → picks */}
-      <div className="h-12 w-full" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
+      <div className="h-6 w-full md:h-12" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
 
       {/* ── Picks preview — full width ─────────────────────────────────── */}
-      <section id="product" className="w-full py-20" style={{ background: "#050508" }}>
+      <section id="product" className="w-full py-12 md:py-20" style={{ background: "#050508" }}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-3 flex items-center gap-3">
             <Label>Picks du soir · NBA</Label>
@@ -476,10 +475,10 @@ export default function Home() {
       </section>
 
       {/* transition picks → features */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #050508, #08080e)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #050508, #08080e)" }} />
 
       {/* ── Features — full width alternating ──────────────────────────── */}
-      <section className="w-full py-24" style={{ background: "#08080e" }}>
+      <section className="w-full py-14 md:py-24" style={{ background: "#08080e" }}>
 
         {/* Feature 1 — Betalyze Score */}
         <div className="mx-auto max-w-6xl px-5">
@@ -614,10 +613,10 @@ export default function Home() {
       </section>
 
       {/* transition features → how it works */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #08080e, #030305)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #08080e, #030305)" }} />
 
       {/* ── How it works — full width ──────────────────────────────────── */}
-      <section id="how" className="w-full py-24" style={{ background: "#030305" }}>
+      <section id="how" className="w-full py-14 md:py-24" style={{ background: "#030305" }}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-12 text-center">
             <Label>Comment ça marche</Label>
@@ -658,10 +657,10 @@ export default function Home() {
       </section>
 
       {/* transition how it works → bet journal */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
 
       {/* ── Bet Journal — full width ───────────────────────────────────── */}
-      <section className="w-full py-24" style={{ background: "#050508" }}>
+      <section className="w-full py-14 md:py-24" style={{ background: "#050508" }}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="grid items-center gap-12 md:grid-cols-2">
             <div>
@@ -759,10 +758,10 @@ export default function Home() {
       </section>
 
       {/* transition bet journal → testimonials */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #050508, #08080e)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #050508, #08080e)" }} />
 
       {/* ── Testimonials ──────────────────────────────────────────────── */}
-      <section className="w-full py-24" style={{ background: "#08080e" }}>
+      <section className="w-full py-14 md:py-24" style={{ background: "#08080e" }}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-12 text-center">
             <Label>Témoignages</Label>
@@ -800,10 +799,10 @@ export default function Home() {
       </section>
 
       {/* transition testimonials → pricing */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #08080e, #030305)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #08080e, #030305)" }} />
 
       {/* ── Pricing ───────────────────────────────────────────────────── */}
-      <section id="pricing" className="w-full py-24" style={{ background: "#030305" }}>
+      <section id="pricing" className="w-full py-14 md:py-24" style={{ background: "#030305" }}>
         <div className="mx-auto max-w-5xl px-5">
           <div className="mb-12 text-center">
             <Label>Tarifs</Label>
@@ -889,10 +888,10 @@ export default function Home() {
       </section>
 
       {/* transition pricing → faq */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #030305, #050508)" }} />
 
       {/* ── FAQ ───────────────────────────────────────────────────────── */}
-      <section id="faq" className="w-full py-24" style={{ background: "#050508" }}>
+      <section id="faq" className="w-full py-14 md:py-24" style={{ background: "#050508" }}>
         <div className="mx-auto max-w-3xl px-5">
           <div className="mb-12 text-center">
             <Label>FAQ</Label>
@@ -927,10 +926,10 @@ export default function Home() {
       </section>
 
       {/* transition faq → cta */}
-      <div className="h-16 w-full" style={{ background: "linear-gradient(to bottom, #050508, #030305)" }} />
+      <div className="h-8 w-full md:h-16" style={{ background: "linear-gradient(to bottom, #050508, #030305)" }} />
 
       {/* ── Final CTA ─────────────────────────────────────────────────── */}
-      <section className="w-full py-24" style={{ background: "#030305" }}>
+      <section className="w-full py-14 md:py-24" style={{ background: "#030305" }}>
         <div className="mx-auto max-w-5xl px-5">
           <div className="relative overflow-hidden rounded-3xl p-10 text-center md:p-16"
             style={{

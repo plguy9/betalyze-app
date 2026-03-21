@@ -99,7 +99,7 @@ export function MobileBottomNav({
                     router.push(`/nba?section=${item.tab}`);
                   }
                 }}
-                className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition"
+                className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 transition"
                 style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.32)" }}
               >
                 {isActive && (
@@ -115,7 +115,7 @@ export function MobileBottomNav({
           <button
             type="button"
             onClick={() => setMoreOpen((p) => !p)}
-            className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition"
+            className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 transition"
             style={{ color: moreOpen || isMoreActive ? "#ffb14a" : "rgba(255,255,255,.32)" }}
           >
             {(moreOpen || isMoreActive) && (

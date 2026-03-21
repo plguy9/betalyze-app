@@ -2,11 +2,11 @@
 
 export const dynamic = "force-dynamic";
 
-import { BookMarked, CreditCard, LayoutDashboard, List, MoreHorizontal, Settings, ShieldAlert, Trophy, Users, X } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
 import { NbaHeader } from "@/app/nba/components/nba-header";
+import { MobileBottomNav } from "@/app/nba/components/mobile-bottom-nav";
 import {
   DEFAULT_DVP_SEASON,
   TOP_PROPS_PAGE_SIZE,
@@ -95,7 +95,6 @@ function NbaPageInner() {
 
   // --- Navigation ---
   const [comingSoon, setComingSoon] = useState<string | null>(null);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const comingSoonTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeSection, setActiveSection] = useState<"dashboard" | "equipes" | "players" | "defense">("dashboard");
 
@@ -1223,104 +1222,10 @@ function NbaPageInner() {
         </div>
       </div>
 
-      {/* ── Mobile "Plus" menu overlay ── */}
-      {moreMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMoreMenuOpen(false)}>
-          {/* Backdrop */}
-          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,.55)", backdropFilter: "blur(4px)" }} />
-          {/* Menu card */}
-          <div
-            className="absolute bottom-20 left-4 right-4 rounded-2xl p-2"
-            style={{
-              background: "rgba(18,18,22,.98)",
-              border: "1px solid rgba(255,255,255,.10)",
-              boxShadow: "0 -8px 40px rgba(0,0,0,.6)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-2 flex items-center justify-between px-3 pt-2 pb-1">
-              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,.25)" }}>Plus</span>
-              <button type="button" onClick={() => setMoreMenuOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,.08)" }}>
-                <X className="h-3.5 w-3.5" style={{ color: "rgba(255,255,255,.5)" }} />
-              </button>
-            </div>
-            {([
-              { label: "Bet Journal",     icon: BookMarked,    action: () => { setMoreMenuOpen(false); setSidebarActive("Bet Journal"); } },
-              { label: "Parlay Builder",  icon: List,          action: () => { setMoreMenuOpen(false); setSidebarActive("Parlay"); } },
-              { label: "Settings",        icon: Settings,      action: () => { setMoreMenuOpen(false); setSidebarActive("Settings"); } },
-              { label: "Billing",         icon: CreditCard,    action: () => { setMoreMenuOpen(false); setSidebarActive("Billing"); } },
-            ]).map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={item.action}
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 transition"
-                  style={{ color: "rgba(255,255,255,.75)" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                >
-                  <Icon className="h-4.5 w-4.5 shrink-0" style={{ color: "rgba(255,138,0,.8)" }} />
-                  <span className="text-[14px] font-medium">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Mobile bottom nav ── */}
-      <nav
-        className="fixed bottom-0 inset-x-0 z-40 md:hidden"
-        style={{
-          background: "rgba(10,10,15,.97)",
-          borderTop: "1px solid rgba(255,255,255,.08)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
-      >
-        <div className="flex items-stretch">
-          {([
-            { label: "Dashboard", page: "Best Props" as NbaSidebarPage, icon: LayoutDashboard },
-            { label: "Players",   page: "Players"    as NbaSidebarPage, icon: Users },
-            { label: "Teams",     page: "Teams"      as NbaSidebarPage, icon: Trophy },
-            { label: "DvP",       page: "DvP"        as NbaSidebarPage, icon: ShieldAlert },
-          ] as const).map((item) => {
-            const isActive = sidebarActive === item.page;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => { setMoreMenuOpen(false); setSidebarActive(item.page); }}
-                className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition"
-                style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.32)" }}
-              >
-                {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full" style={{ background: "#ffb14a" }} />
-                )}
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] font-semibold tracking-tight">{item.label}</span>
-              </button>
-            );
-          })}
-          {/* Plus button */}
-          <button
-            type="button"
-            onClick={() => setMoreMenuOpen((prev) => !prev)}
-            className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition"
-            style={{ color: moreMenuOpen ? "#ffb14a" : "rgba(255,255,255,.32)" }}
-          >
-            {moreMenuOpen && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full" style={{ background: "#ffb14a" }} />
-            )}
-            <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[10px] font-semibold tracking-tight">Plus</span>
-          </button>
-        </div>
-      </nav>
+      <MobileBottomNav
+        activeTab={activeSection}
+        onTabChange={(tab) => setActiveSection(tab)}
+      />
       </div>
     </div>
   );

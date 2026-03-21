@@ -24,7 +24,7 @@ const THE_ODDS_DEFAULT_MARKETS = [
   "player_threes",
   "player_threes_alternate",
 ].join(",");
-const CACHE_DIR = path.join(process.cwd(), ".cache");
+const CACHE_DIR = process.env.VERCEL ? "/tmp/.cache" : path.join(process.cwd(), ".cache");
 const QUERY_TIMEZONE = "America/Toronto";
 
 type TheOddsOutcome = {

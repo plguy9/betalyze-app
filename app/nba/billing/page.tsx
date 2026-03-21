@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
 import { NbaHeader } from "@/app/nba/components/nba-header";
+import { MobileBottomNav } from "@/app/nba/components/mobile-bottom-nav";
 
 /* ── Types ── */
 
@@ -557,39 +558,7 @@ export default function NbaBillingPage() {
         </div>
       </div>
 
-      {/* Mobile bottom nav — identical to settings/page.tsx */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around px-2 py-2 md:hidden"
-        style={{
-          background: "rgba(8,8,14,.96)",
-          borderTop: "1px solid rgba(255,255,255,.09)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}
-      >
-        {([
-          { label: "Props",    page: "Best Props" as NbaSidebarPage, icon: <Sparkles className="h-5 w-5" /> },
-          { label: "Teams",   page: "Teams"      as NbaSidebarPage, icon: <Activity  className="h-5 w-5" /> },
-          { label: "Parlay",  page: "Parlay"     as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
-          { label: "DvP",     page: "DvP"        as NbaSidebarPage, icon: <Flame     className="h-5 w-5" /> },
-          { label: "Journal", page: "Bet Journal" as NbaSidebarPage, icon: <BookOpen  className="h-5 w-5" /> },
-          { label: "Billing", page: "Billing"    as NbaSidebarPage, icon: <CreditCard className="h-5 w-5" /> },
-        ]).map((item) => {
-          const isActive = sidebarActive === item.page;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => setSidebarActive(item.page)}
-              className="flex flex-col items-center gap-1 rounded-xl px-5 py-1.5 transition"
-              style={{ color: isActive ? "#ffb14a" : "rgba(255,255,255,.38)" }}
-            >
-              {item.icon}
-              <span className="text-[10px] font-semibold">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <MobileBottomNav />
       </div>
     </div>
   );

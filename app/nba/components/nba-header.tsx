@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Loader2, Search, User, X } from "lucide-react";
+import { Bell, CreditCard, Loader2, LogOut, Search, Settings, User, X } from "lucide-react";
 import { BetalyzeLogo } from "@/components/betalyze-logo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -52,8 +52,37 @@ export function NbaHeader({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountUser, setAccountUser] = useState<{ displayName: string | null; email: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { authenticated?: boolean; user?: { displayName?: string | null; email?: string } }) => {
+        if (d.authenticated && d.user) {
+          setAccountUser({ displayName: d.user.displayName ?? null, email: d.user.email ?? "" });
+        }
+      })
+      .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/account");
+  }
 
   const query = search.trim();
   const isInteractive = !!setSearch;
@@ -289,18 +318,66 @@ export function NbaHeader({
         >
           <Bell className="h-4 w-4" />
         </button>
-        <Link
-          href="/account"
-          className="flex h-9 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.04] px-3 text-[12px] text-white/50 transition hover:border-white/15 hover:text-white/80"
-        >
-          <div
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-            style={{ background: "linear-gradient(135deg,#ff8a00,#ffb14a)" }}
+
+        {/* Account dropdown — desktop only */}
+        <div ref={accountRef} className="relative hidden md:block">
+          <button
+            type="button"
+            onClick={() => setAccountOpen((p) => !p)}
+            className="flex h-9 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.04] px-3 text-[12px] text-white/50 transition hover:border-white/15 hover:text-white/80"
           >
-            <User className="h-3 w-3 text-black" />
-          </div>
-          <span className="hidden sm:block">Mon compte</span>
-        </Link>
+            <div
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "linear-gradient(135deg,#ff8a00,#ffb14a)" }}
+            >
+              <User className="h-3 w-3 text-black" />
+            </div>
+            <span>{accountUser?.displayName?.split(" ")[0] ?? "Mon compte"}</span>
+          </button>
+
+          {accountOpen && (
+            <div
+              className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl p-1.5"
+              style={{
+                background: "rgba(14,14,20,.98)",
+                border: "1px solid rgba(255,255,255,.10)",
+                boxShadow: "0 16px 48px rgba(0,0,0,.6)",
+              }}
+            >
+              {accountUser && (
+                <div className="px-3 py-2.5 border-b border-white/[0.06] mb-1">
+                  <p className="text-[13px] font-semibold text-white/90">{accountUser.displayName ?? "—"}</p>
+                  <p className="text-[11px] text-white/35 truncate">{accountUser.email}</p>
+                </div>
+              )}
+              <Link
+                href="/nba/billing"
+                onClick={() => setAccountOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <CreditCard className="h-4 w-4 text-amber-400/70" />
+                Billing
+              </Link>
+              <Link
+                href="/nba/settings"
+                onClick={() => setAccountOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <Settings className="h-4 w-4 text-amber-400/70" />
+                Settings
+              </Link>
+              <div className="my-1 border-t border-white/[0.06]" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] text-rose-300/80 transition hover:bg-rose-500/10 hover:text-rose-200"
+              >
+                <LogOut className="h-4 w-4" />
+                Se déconnecter
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       </div>
     </div>

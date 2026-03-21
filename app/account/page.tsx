@@ -44,6 +44,7 @@ function AccountPageInner() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
+  const [multiSessionWarning, setMultiSessionWarning] = useState(false);
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
@@ -102,8 +103,7 @@ function AccountPageInner() {
     return d.toLocaleString("fr-CA", { hour12: false });
   }, [expiresAt]);
 
-  async function handleLogin(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function doLogin(forceNewSession = false) {
     setWorking(true);
     setError(null);
     setInfo(null);
@@ -111,15 +111,15 @@ function AccountPageInner() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: loginEmail,
-          password: loginPassword,
-          rememberMe,
-        }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, rememberMe, forceNewSession }),
       });
       const payload = await parseApiPayload(res);
       if (!res.ok) {
         setError((payload.error as string | undefined) ?? "Connexion impossible.");
+        return;
+      }
+      if (payload.multiSession) {
+        setMultiSessionWarning(true);
         return;
       }
       router.push("/nba");
@@ -128,6 +128,12 @@ function AccountPageInner() {
     } finally {
       setWorking(false);
     }
+  }
+
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setMultiSessionWarning(false);
+    await doLogin(false);
   }
 
   async function handleRegister(e: FormEvent<HTMLFormElement>) {
@@ -377,6 +383,30 @@ function AccountPageInner() {
                 </form>
               )}
             </>
+          )}
+
+          {multiSessionWarning && (
+            <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm">
+              <p className="font-semibold text-amber-200">Session active sur un autre appareil</p>
+              <p className="mt-1 text-xs text-amber-200/70">En continuant, l&apos;autre appareil sera déconnecté.</p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void doLogin(true)}
+                  disabled={working}
+                  className="rounded-full bg-amber-500/20 px-4 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-60"
+                >
+                  {working ? "..." : "Continuer"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMultiSessionWarning(false)}
+                  className="rounded-full bg-white/5 px-4 py-1.5 text-xs font-semibold text-white/50 transition hover:bg-white/10"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
           )}
 
           {error && (

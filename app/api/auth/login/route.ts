@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  countActiveSessionsForUser,
   createAuthSession,
   findAuthUserByEmail,
+  revokeAllAuthSessionsForUser,
   touchAuthUserLastLogin,
 } from "@/lib/auth/db";
 import { verifyPassword } from "@/lib/auth/password";
@@ -19,6 +21,7 @@ type LoginBody = {
   email?: string;
   password?: string;
   rememberMe?: boolean;
+  forceNewSession?: boolean;
 };
 
 export async function POST(req: NextRequest) {
@@ -32,6 +35,7 @@ export async function POST(req: NextRequest) {
   const email = normalizeAuthEmail(String(body.email ?? ""));
   const password = String(body.password ?? "");
   const rememberMe = body.rememberMe !== false;
+  const forceNewSession = body.forceNewSession === true;
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email et mot de passe obligatoires" },
@@ -53,6 +57,16 @@ export async function POST(req: NextRequest) {
       { error: "Identifiants invalides" },
       { status: 401 },
     );
+  }
+
+  // Vérifier s'il existe déjà une session active sur un autre appareil
+  if (!forceNewSession) {
+    const activeCount = await countActiveSessionsForUser(user.id);
+    if (activeCount > 0) {
+      return NextResponse.json({ multiSession: true, sessionCount: activeCount }, { status: 200 });
+    }
+  } else {
+    await revokeAllAuthSessionsForUser(user.id);
   }
 
   const sessionToken = generateSessionToken();

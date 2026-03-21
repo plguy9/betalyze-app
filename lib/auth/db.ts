@@ -235,6 +235,15 @@ export async function revokeAllAuthSessionsForUser(userId: number): Promise<void
   `;
 }
 
+export async function countActiveSessionsForUser(userId: number): Promise<number> {
+  await ensureAuthTables();
+  const rows = await prisma.$queryRaw<[{ count: bigint }]>`
+    select count(*) as count from app_user_sessions
+    where user_id = ${userId} and revoked_at is null and expires_at > now()
+  `;
+  return Number(rows[0]?.count ?? 0);
+}
+
 // ── Stripe ────────────────────────────────────────────────────────────────────
 
 export async function ensureStripeColumns(): Promise<void> {

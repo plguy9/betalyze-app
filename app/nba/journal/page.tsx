@@ -1224,13 +1224,6 @@ export default function NbaBetJournalPage() {
                   <Calendar className="h-3.5 w-3.5" />
                   {new Date().toLocaleDateString("fr-CA")}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void refreshJournal()}
-                  className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/70 transition hover:bg-white/10"
-                >
-                  Rafraîchir <RefreshCw className="h-3.5 w-3.5" />
-                </button>
               </div>
             </div>
 

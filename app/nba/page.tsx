@@ -1158,7 +1158,6 @@ function NbaPageInner() {
                 onPrevPage={() => setTopPropsPage((prev) => Math.max(1, prev - 1))}
                 onNextPage={() => setTopPropsPage((prev) => Math.min(topPropsPageCount, prev + 1))}
                 topPropsPageCount={topPropsPageCount}
-                loadTopProps={loadTopProps}
                 addTopPropToJournal={addTopPropToJournal}
                 addTopPropToParlay={addTopPropToParlay}
                 isTopPropInParlay={isTopPropInParlay}

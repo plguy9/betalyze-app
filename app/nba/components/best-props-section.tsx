@@ -34,7 +34,6 @@ type Props = {
   onPrevPage: () => void;
   onNextPage: () => void;
   topPropsPageCount: number;
-  loadTopProps: (refresh: boolean) => void;
   addTopPropToJournal: (prop: NbaTopProp, teamLabel: string, oppLabel: string) => void;
   addTopPropToParlay: (prop: NbaTopProp) => void;
   isTopPropInParlay: (prop: NbaTopProp) => boolean;
@@ -64,7 +63,6 @@ export function BestPropsSection({
   onPrevPage,
   onNextPage,
   topPropsPageCount,
-  loadTopProps,
   addTopPropToJournal,
   addTopPropToParlay,
   isTopPropInParlay,
@@ -122,14 +120,6 @@ export function BestPropsSection({
                 { value: "EDGE", label: "Edge" },
               ]}
             />
-            <button
-              type="button"
-              onClick={() => loadTopProps(true)}
-              className="whitespace-nowrap text-xs text-white/50 transition hover:text-white"
-              disabled={topPropsLoading}
-            >
-              Rafraîchir ↻
-            </button>
           </div>
         </div>
 

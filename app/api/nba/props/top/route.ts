@@ -1566,7 +1566,7 @@ export async function GET(req: NextRequest) {
       const best = new Map<string, TopProp>();
       for (const pick of picks) {
         const key =
-          `${normalizeText(pick.player)}::${String(pick.metric).toUpperCase()}::${pick.side}`;
+          `${normalizeText(pick.player)}::${String(pick.metric).toUpperCase()}::${pick.side}::${pick.line}`;
         const existing = best.get(key);
         if (
           !existing ||

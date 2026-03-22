@@ -11,7 +11,7 @@ import {
 const THE_ODDS_API_KEY = process.env.THE_ODDS_API_KEY ?? process.env.ODDS_API_KEY;
 const THE_ODDS_API_BASE = process.env.ODDS_API_URL || "https://api.the-odds-api.com/v4";
 const THE_ODDS_NBA_SPORT = "basketball_nba";
-const THE_ODDS_REGIONS = "us";
+const THE_ODDS_BOOKMAKERS = "draftkings,fanduel,betmgm,bet365,williamhill_us,fanatics";
 const THE_ODDS_DEFAULT_MARKETS = [
   "player_points",
   "player_points_alternate",
@@ -245,7 +245,7 @@ async function fetchTheOddsEventsWindow(
       `${THE_ODDS_API_BASE}/`,
     );
     oddsUrl.searchParams.set("apiKey", THE_ODDS_API_KEY!);
-    oddsUrl.searchParams.set("regions", THE_ODDS_REGIONS);
+    oddsUrl.searchParams.set("bookmakers", THE_ODDS_BOOKMAKERS);
     oddsUrl.searchParams.set("markets", THE_ODDS_DEFAULT_MARKETS);
     oddsUrl.searchParams.set("oddsFormat", "decimal");
     oddsUrl.searchParams.set("dateFormat", "iso");

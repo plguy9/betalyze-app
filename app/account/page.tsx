@@ -122,7 +122,7 @@ function AccountPageInner() {
         setMultiSessionWarning(true);
         return;
       }
-      router.push("/nba");
+      window.location.href = "/nba";
     } catch {
       setError("Erreur reseau pendant la connexion.");
     } finally {
@@ -156,7 +156,7 @@ function AccountPageInner() {
         setError((payload.error as string | undefined) ?? "Inscription impossible.");
         return;
       }
-      router.push("/nba");
+      window.location.href = "/nba";
     } catch {
       setError("Erreur reseau pendant l'inscription.");
     } finally {

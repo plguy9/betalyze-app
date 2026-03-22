@@ -726,10 +726,15 @@ function NbaParlayPageInner() {
                     <div className="flex flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5">
                       <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
                       <input
+                        type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Chercher un joueur…"
-                        className="flex-1 bg-transparent text-[12px] text-white placeholder-white/25 outline-none"
+                        className="flex-1 min-w-0 bg-transparent text-[12px] text-white placeholder-white/25 outline-none"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
                       />
                       {searchQuery && (
                         <button

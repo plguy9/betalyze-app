@@ -299,7 +299,7 @@ export function NbaHeader({
           </>
         ) : (
           /* Pages sans search (settings, billing, etc.) */
-          <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-white/25">
+          <div className="hidden md:flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-white/25">
             <Search className="h-4 w-4 shrink-0" />
             <span className="flex-1">Rechercher joueur, équipe…</span>
             <kbd className="hidden sm:inline-flex items-center rounded border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-white/20">⌘K</kbd>

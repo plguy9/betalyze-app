@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/nba/logs/refresh-yesterday",
+      "path": "/api/nba/logs/refresh-yesterday?concurrency=20&refreshRoster=0",
       "schedule": "0 10 * * *"
     },
     {

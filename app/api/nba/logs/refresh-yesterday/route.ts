@@ -553,8 +553,14 @@ function buildSeasonAliases(input: string): string[] {
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${cronSecret}`) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    const customHeader = req.headers.get("x-cron-secret") ?? "";
+    const querySecret = req.nextUrl.searchParams.get("secret") ?? "";
+    const valid =
+      authHeader === `Bearer ${cronSecret}` ||
+      customHeader === cronSecret ||
+      querySecret === cronSecret;
+    if (!valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }

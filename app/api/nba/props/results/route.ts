@@ -148,7 +148,7 @@ export async function GET(req: Request) {
             three_points_made
           FROM nba_player_game_logs
           WHERE player_id IN (${Prisma.join(playerIds.map((id) => Prisma.sql`${id}`))})
-            AND date::date = ${date}::date
+            AND (date AT TIME ZONE 'America/Toronto')::date = ${date}::date
             AND (is_preseason IS NULL OR is_preseason = false)
         `,
       );
@@ -249,20 +249,9 @@ export async function GET(req: Request) {
       streak = { type: lastType, count };
     }
 
-    // Diagnostic pour débugger si 0 résultats
-    const propsWithId = props.filter((p) => p.playerId && Number.isFinite(p.playerId)).length;
-    const propsWithoutId = props.length - propsWithId;
-
     return NextResponse.json({
       ok: true,
       date,
-      debug: {
-        propsInCache: props.length,
-        propsWithPlayerId: propsWithId,
-        propsWithoutPlayerId: propsWithoutId,
-        logsFound: logsMap.size,
-        resultsAfterFilter: results.length,
-      },
       results: results.sort((a, b) => {
         const gi = (g: string) => GRADE_ORDER.indexOf(g);
         if (gi(a.grade) !== gi(b.grade)) return gi(a.grade) - gi(b.grade);

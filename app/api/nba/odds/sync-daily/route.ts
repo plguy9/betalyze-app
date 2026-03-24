@@ -281,10 +281,11 @@ async function fetchTheOddsEventsWindow(
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization") ?? "";
+  const secretParam = req.nextUrl.searchParams.get("secret") ?? "";
   let isAuthorizedCron = false;
   if (cronSecret) {
     const expected = `Bearer ${cronSecret}`;
-    isAuthorizedCron = auth === expected;
+    isAuthorizedCron = auth === expected || secretParam === cronSecret;
     if (!isAuthorizedCron) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

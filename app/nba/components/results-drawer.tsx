@@ -4,6 +4,22 @@ import { useEffect, useState } from "react";
 import type { PropResultsPayload, GradeSummary, PropResult } from "@/app/api/nba/props/results/route";
 import { gradeTone, formatOddsForDisplay, type OddsDisplayFormat } from "./nba-helpers";
 
+type HistoryPayload = {
+  ok: boolean;
+  dates: {
+    date: string;
+    grades: Record<string, { hits: number; total: number; hit_rate: number; roi: number }>;
+    totalHits: number;
+    totalPicks: number;
+    hitRate: number;
+  }[];
+  globalByGrade: { grade: string; hits: number; total: number; hitRate: number }[];
+  totalHits: number;
+  totalPicks: number;
+  overallHitRate: number;
+  daysTracked: number;
+};
+
 function hitRateColor(rate: number): string {
   if (rate >= 70) return "#22c55e";
   if (rate >= 55) return "#f59e0b";
@@ -77,8 +93,105 @@ function ResultRow({ r, oddsFormat }: { r: PropResult; oddsFormat: OddsDisplayFo
   );
 }
 
+const GRADES = ["A+", "A", "A-", "B+", "B"];
+
+function HistoryView() {
+  const [hist, setHist] = useState<HistoryPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/nba/props/results/history")
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setHist(json); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-10 animate-pulse rounded-xl" style={{ background: "rgba(255,255,255,.04)" }} />
+      ))}
+    </div>
+  );
+
+  if (!hist || hist.daysTracked === 0) return (
+    <div className="rounded-xl border border-white/8 p-5 text-center">
+      <p className="text-[13px] text-white/40">Aucun historique disponible</p>
+      <p className="mt-1 text-[11px] text-white/20">Les données s'accumulent automatiquement chaque jour.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Global par grade */}
+      <div>
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">
+          Global · {hist.daysTracked} soirs · {hist.totalPicks} picks
+        </p>
+        <div className="space-y-2.5">
+          {hist.globalByGrade.map((g) => (
+            <GradeBar key={g.grade} g={g} />
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,.04)" }}>
+          <span className="text-[11px] text-white/40">Taux global</span>
+          <span className="text-[15px] font-black" style={{ color: hitRateColor(hist.overallHitRate) }}>
+            {hist.overallHitRate}%
+          </span>
+        </div>
+      </div>
+
+      {/* Tableau par date */}
+      <div>
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Par date</p>
+        <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid rgba(255,255,255,.07)" }}>
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
+                <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
+                {GRADES.map((g) => (
+                  <th key={g} className="px-2 py-2 text-center font-medium text-white/30">{g}</th>
+                ))}
+                <th className="px-3 py-2 text-right font-medium text-white/30">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hist.dates.map((row, i) => (
+                <tr
+                  key={row.date}
+                  style={{ borderBottom: i < hist.dates.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}
+                >
+                  <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
+                  {GRADES.map((g) => {
+                    const gd = row.grades[g];
+                    return (
+                      <td key={g} className="px-2 py-2 text-center tabular-nums">
+                        {gd ? (
+                          <span style={{ color: hitRateColor(gd.hit_rate) }}>
+                            {gd.hits}/{gd.total}
+                          </span>
+                        ) : (
+                          <span className="text-white/15">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right font-semibold" style={{ color: hitRateColor(row.hitRate) }}>
+                    {row.hitRate}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ResultsDrawer({ oddsFormat }: { oddsFormat: OddsDisplayFormat }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"today" | "history">("today");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PropResultsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,33 +248,53 @@ export function ResultsDrawer({ oddsFormat }: { oddsFormat: OddsDisplayFormat })
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
-          <div className="flex items-start gap-3">
-            <div
-              className="mt-0.5 h-5 w-0.5 shrink-0 rounded-full"
-              style={{ background: "linear-gradient(to bottom, #ff8a00, #ffb14a44)" }}
-            />
-            <div>
-              <h2 className="text-[15px] font-bold text-white">BZ Picks · Performance hier</h2>
-              {data && (
-                <p className="mt-0.5 text-[11px] text-white/40">
-                  {data.date} · {data.totalProps} picks grade B et +
-                </p>
-              )}
+        <div className="border-b border-white/8 px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <div
+                className="mt-0.5 h-5 w-0.5 shrink-0 rounded-full"
+                style={{ background: "linear-gradient(to bottom, #ff8a00, #ffb14a44)" }}
+              />
+              <div>
+                <h2 className="text-[15px] font-bold text-white">BZ Picks · Performance</h2>
+                {view === "today" && data && (
+                  <p className="mt-0.5 text-[11px] text-white/40">
+                    {data.date} · {data.totalProps} picks grade B et +
+                  </p>
+                )}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-white/40 transition hover:text-white"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-white/40 transition hover:text-white"
-          >
-            ✕
-          </button>
+          {/* Toggle hier / long terme */}
+          <div className="mt-3 flex gap-1 rounded-xl p-1" style={{ background: "rgba(255,255,255,.04)" }}>
+            {(["today", "history"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className="flex-1 rounded-lg py-1.5 text-[11px] font-semibold transition"
+                style={{
+                  background: view === v ? "rgba(245,158,11,.15)" : "transparent",
+                  color: view === v ? "#f59e0b" : "rgba(255,255,255,.35)",
+                }}
+              >
+                {v === "today" ? "Performance hier" : "Long terme"}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading && (
+          {view === "history" && <HistoryView />}
+          {view === "today" && loading && (
             <div className="flex flex-col gap-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-8 animate-pulse rounded-xl" style={{ background: "rgba(255,255,255,.04)" }} />
@@ -169,14 +302,14 @@ export function ResultsDrawer({ oddsFormat }: { oddsFormat: OddsDisplayFormat })
             </div>
           )}
 
-          {error && !loading && (
+          {view === "today" && error && !loading && (
             <div className="rounded-xl border border-rose-500/20 bg-rose-500/8 p-4 text-center">
               <p className="text-[12px] text-rose-400">{error}</p>
               <p className="mt-1 text-[10px] text-white/30">Les logs doivent être synchronisés d'abord.</p>
             </div>
           )}
 
-          {data && !loading && (
+          {view === "today" && data && !loading && (
             <div className="space-y-5">
               {/* Overall */}
               <div

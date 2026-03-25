@@ -64,6 +64,7 @@ async function callSync({
   dry,
   timeoutMs,
   authHeader,
+  secret,
 }) {
   const url = new URL("/api/nba/logs/refresh-yesterday", origin);
   url.searchParams.set("date", date);
@@ -73,6 +74,7 @@ async function callSync({
   if (typeof refreshRoster === "string") url.searchParams.set("refreshRoster", refreshRoster);
   if (details) url.searchParams.set("details", "1");
   if (dry) url.searchParams.set("dry", "1");
+  if (secret) url.searchParams.set("secret", secret);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -135,6 +137,7 @@ async function main() {
       dry,
       timeoutMs,
       authHeader,
+      secret,
     });
     lastResult = result;
 

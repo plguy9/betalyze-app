@@ -632,10 +632,10 @@ function dedupeLogsByGame(rows: LogRow[]): LogRow[] {
 }
 
 function gradeFromScore(score: number): string {
-  if (score >= 93) return "S";
-  if (score >= 80) return "A";
-  if (score >= 67) return "B";
-  if (score >= 52) return "C";
+  if (score >= 96) return "S";
+  if (score >= 84) return "A";
+  if (score >= 70) return "B";
+  if (score >= 54) return "C";
   return "F";
 }
 
@@ -1251,7 +1251,7 @@ export async function GET(req: NextRequest) {
         const mean = avg(values);
         const sd = stdDev(values);
         const cv = mean > 0 ? sd / mean : 1;
-        const lineEdgeBase = line > 0 ? clamp(((mean - line) / line) * 40, -20, 20) : 0;
+        const lineEdgeBase = line > 0 ? clamp(((mean - line) / line) * 30, -14, 14) : 0;
         const awayCode = pack.awayCode;
         const homeCode = pack.homeCode;
         const gameCodes = new Set(
@@ -1457,7 +1457,7 @@ export async function GET(req: NextRequest) {
           const modelEdgePct = weightedHitRate - impliedProbabilityPct;
           const americanOdds = decimalToAmericanOdds(odd);
           const lineEdge = lineEdgeBase * sideMultiplier;
-          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 40, -20, 20);
+          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 28, -14, 14);
           const rankEdge = rankEdgeBase * sideMultiplier;
           const strengthEdge = strengthEdgeBase * sideMultiplier;
           const matchupPct = pctHit(matchupBase, line, side);

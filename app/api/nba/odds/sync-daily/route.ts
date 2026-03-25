@@ -131,11 +131,6 @@ function cacheFilePath(dateKey: string) {
   return path.join(CACHE_DIR, `nba-events-${dateKey}.json`);
 }
 
-function getInternalAuthHeader(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  return auth ? ({ authorization: auth } as Record<string, string>) : undefined;
-}
-
 function normalizeText(value: string | null | undefined): string {
   return String(value ?? "")
     .toLowerCase()
@@ -489,11 +484,10 @@ export async function GET(req: NextRequest) {
       const logsUrl = new URL("/api/nba/logs/refresh-yesterday", req.nextUrl.origin);
       logsUrl.searchParams.set("refreshRoster", "0");
       logsUrl.searchParams.set("concurrency", "12");
+      if (cronSecret) logsUrl.searchParams.set("secret", cronSecret);
       logsRefreshSync.attempted = true;
-      const internalAuthHeader = getInternalAuthHeader(req);
       const logsRes = await fetch(logsUrl.toString(), {
         cache: "no-store",
-        ...(internalAuthHeader ? { headers: internalAuthHeader } : {}),
       });
       const logsJson = (await logsRes.json().catch(() => null)) as
         | {

@@ -1224,7 +1224,7 @@ function extractPlayerPropsFromTheOddsBook(book: TheOddsBookmaker): PlayerProp[]
       if (side.includes("over")) current.overOdd = odd;
       if (side.includes("under")) current.underOdd = odd;
       current.odd = current.overOdd ?? current.underOdd ?? current.odd ?? odd;
-      current.isAlternate = Boolean(current.isAlternate) || isAlternateMarket;
+      if (!isAlternateMarket) current.isAlternate = false;
       merged.set(key, current);
     }
   }

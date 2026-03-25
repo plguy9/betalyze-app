@@ -174,12 +174,12 @@ export function DashboardSection({
           </p>
         </div>
 
-        {/* Card 2 — Picks B+ */}
+        {/* Card 2 — Picks S/A/B */}
         <div
           className="rounded-2xl p-4"
           style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)" }}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Picks B+ ce soir</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Picks S/A/B ce soir</p>
           {topPropsLoading ? (
             <SkeletonLine w="w-12" h="h-8 mt-2" />
           ) : (

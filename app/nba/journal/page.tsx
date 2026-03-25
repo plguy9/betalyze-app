@@ -1240,7 +1240,7 @@ export default function NbaBetJournalPage() {
                     subtitle="units settled"
                   />
                   <StatTile
-                    title="WR A-/A/A+"
+                    title="WR S/A/B"
                     value={`${kpis.highGradeWinRate}%`}
                     subtitle={`${kpis.highGradeSamples} bets`}
                     glowClass={winRateGlowClass(kpis.highGradeWinRate)}
@@ -2045,7 +2045,7 @@ export default function NbaBetJournalPage() {
                             value={form.grade}
                             onChange={(e) => setForm((prev) => ({ ...prev, grade: e.target.value }))}
                             className="h-10 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-orange-400/45"
-                            placeholder="A+"
+                            placeholder="S"
                           />
                         </label>
                         <label className="space-y-1">

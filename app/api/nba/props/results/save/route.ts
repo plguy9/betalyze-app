@@ -122,8 +122,19 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Calcul résultats par grade
-      const gradeMap = new Map<string, { hits: number; total: number; roiSum: number }>();
+      // Nombre de matchs pour cette date
+      const gamesResult = await prisma.$queryRaw<{ games: bigint }[]>(
+        Prisma.sql`
+          SELECT count(distinct game_id) as games
+          FROM nba_player_game_logs
+          WHERE (date AT TIME ZONE 'America/Toronto')::date = ${date}::date
+            AND (is_preseason IS NULL OR is_preseason = false)
+        `,
+      );
+      const gamesCount = Number(gamesResult[0]?.games ?? 0);
+
+      // Calcul résultats par grade + over/under
+      const gradeMap = new Map<string, { hits: number; total: number; roiSum: number; overHits: number; overTotal: number; underHits: number; underTotal: number }>();
 
       for (const prop of props) {
         if (!prop.playerId || !Number.isFinite(prop.playerId)) continue;
@@ -136,13 +147,20 @@ export async function GET(req: NextRequest) {
         const isHit =
           prop.side === "over" ? actual >= prop.line : actual < prop.line;
 
-        const g = gradeMap.get(prop.grade) ?? { hits: 0, total: 0, roiSum: 0 };
+        const g = gradeMap.get(prop.grade) ?? { hits: 0, total: 0, roiSum: 0, overHits: 0, overTotal: 0, underHits: 0, underTotal: 0 };
         g.total++;
         if (isHit) {
           g.hits++;
           g.roiSum += prop.odds && Number.isFinite(prop.odds) ? prop.odds - 1 : 0.9;
         } else {
           g.roiSum -= 1;
+        }
+        if (prop.side === "over") {
+          g.overTotal++;
+          if (isHit) g.overHits++;
+        } else {
+          g.underTotal++;
+          if (isHit) g.underHits++;
         }
         gradeMap.set(prop.grade, g);
       }
@@ -156,13 +174,18 @@ export async function GET(req: NextRequest) {
         const roi = Math.round((g.roiSum / g.total) * 100);
 
         await prisma.$executeRaw`
-          INSERT INTO nba_picks_results_daily (date, grade, hits, total, hit_rate, roi, updated_at)
-          VALUES (${date}, ${grade}, ${g.hits}, ${g.total}, ${hitRate}, ${roi}, now())
+          INSERT INTO nba_picks_results_daily (date, grade, hits, total, hit_rate, roi, over_hits, over_total, under_hits, under_total, games, updated_at)
+          VALUES (${date}, ${grade}, ${g.hits}, ${g.total}, ${hitRate}, ${roi}, ${g.overHits}, ${g.overTotal}, ${g.underHits}, ${g.underTotal}, ${gamesCount}, now())
           ON CONFLICT (date, grade) DO UPDATE SET
             hits = EXCLUDED.hits,
             total = EXCLUDED.total,
             hit_rate = EXCLUDED.hit_rate,
             roi = EXCLUDED.roi,
+            over_hits = EXCLUDED.over_hits,
+            over_total = EXCLUDED.over_total,
+            under_hits = EXCLUDED.under_hits,
+            under_total = EXCLUDED.under_total,
+            games = EXCLUDED.games,
             updated_at = now()
         `;
         savedGrades++;

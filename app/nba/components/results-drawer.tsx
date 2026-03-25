@@ -8,7 +8,8 @@ type HistoryPayload = {
   ok: boolean;
   dates: {
     date: string;
-    grades: Record<string, { hits: number; total: number; hit_rate: number; roi: number }>;
+    grades: Record<string, { hits: number; total: number; hit_rate: number; roi: number; over_hits: number; over_total: number; under_hits: number; under_total: number }>;
+    games: number;
     totalHits: number;
     totalPicks: number;
     hitRate: number;
@@ -18,6 +19,10 @@ type HistoryPayload = {
   totalPicks: number;
   overallHitRate: number;
   daysTracked: number;
+  overHitRate: number;
+  underHitRate: number;
+  overTotal: number;
+  underTotal: number;
 };
 
 function hitRateColor(rate: number): string {
@@ -133,11 +138,21 @@ function HistoryView() {
             <GradeBar key={g.grade} g={g} />
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,.04)" }}>
-          <span className="text-[11px] text-white/40">Taux global</span>
-          <span className="text-[15px] font-black" style={{ color: hitRateColor(hist.overallHitRate) }}>
-            {hist.overallHitRate}%
-          </span>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="flex flex-col items-center justify-center rounded-xl py-2.5" style={{ background: "rgba(255,255,255,.04)" }}>
+            <p className="text-[9px] uppercase tracking-wider text-white/30">Global</p>
+            <p className="mt-0.5 text-[16px] font-black" style={{ color: hitRateColor(hist.overallHitRate) }}>{hist.overallHitRate}%</p>
+          </div>
+          <div className="flex flex-col items-center justify-center rounded-xl py-2.5" style={{ background: "rgba(255,255,255,.04)" }}>
+            <p className="text-[9px] uppercase tracking-wider text-white/30">Over</p>
+            <p className="mt-0.5 text-[16px] font-black" style={{ color: hitRateColor(hist.overHitRate) }}>{hist.overHitRate}%</p>
+            <p className="text-[9px] text-white/20">{hist.overTotal} picks</p>
+          </div>
+          <div className="flex flex-col items-center justify-center rounded-xl py-2.5" style={{ background: "rgba(255,255,255,.04)" }}>
+            <p className="text-[9px] uppercase tracking-wider text-white/30">Under</p>
+            <p className="mt-0.5 text-[16px] font-black" style={{ color: hitRateColor(hist.underHitRate) }}>{hist.underHitRate}%</p>
+            <p className="text-[9px] text-white/20">{hist.underTotal} picks</p>
+          </div>
         </div>
       </div>
 
@@ -149,10 +164,11 @@ function HistoryView() {
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
                 <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
+                <th className="px-2 py-2 text-center font-medium text-white/30">Mtch</th>
                 {GRADES.map((g) => (
                   <th key={g} className="px-2 py-2 text-center font-medium text-white/30">{g}</th>
                 ))}
-                <th className="px-3 py-2 text-right font-medium text-white/30">Total</th>
+                <th className="px-3 py-2 text-right font-medium text-white/30">%</th>
               </tr>
             </thead>
             <tbody>
@@ -162,6 +178,7 @@ function HistoryView() {
                   style={{ borderBottom: i < hist.dates.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}
                 >
                   <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.games || "—"}</td>
                   {GRADES.map((g) => {
                     const gd = row.grades[g];
                     return (

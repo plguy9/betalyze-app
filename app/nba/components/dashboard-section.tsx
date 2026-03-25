@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Card } from "./nba-ui";
 import { formatDecimal, formatEdge, formatTodayLabel, formatOddsForDisplay, gradeTone, gradeSortRank, type OddsDisplayFormat } from "./nba-helpers";
 import type { NbaJournalEntry, NbaTopProp } from "./nba-shared-types";
-import { ResultsDrawer } from "./results-drawer";
 
 type Props = {
   gamesCount: number;
@@ -140,7 +139,6 @@ export function DashboardSection({
           <p className="mt-0.5 text-[13px] text-white/40">{formatTodayLabel(today)} · NBA</p>
         </div>
         <div className="flex items-center gap-2">
-          <ResultsDrawer oddsFormat={oddsFormat} />
           <button
             type="button"
             onClick={onOpenPlayers}

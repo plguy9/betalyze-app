@@ -280,7 +280,7 @@ export function BestPropsSection({
                       className="text-[11px] font-bold tabular-nums"
                       style={{ color: edgePos ? "#34d399" : "rgba(255,255,255,.30)" }}
                     >
-                      {edgePos ? "+" : ""}{formatEdge(p.edge)} edge
+                      {formatEdge(p.edge)} edge
                     </span>
                     <span className="text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
                       BZ <span className="font-bold text-white/50">{formatDecimal(p.score, 0)}</span>

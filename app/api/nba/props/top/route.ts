@@ -1489,7 +1489,7 @@ export async function GET(req: NextRequest) {
             side,
             line,
             odds: odd,
-            edge: Number(edgePct.toFixed(1)),
+            edge: Number(modelEdgePct.toFixed(1)),
             hitRate: Number(weightedHitRate.toFixed(1)),
             hitRateL5: Number(hitRateL5.toFixed(1)),
             hitRateL10: Number(hitRateL10.toFixed(1)),

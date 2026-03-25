@@ -3,10 +3,6 @@
     {
       "path": "/api/nba/logs/refresh-yesterday?concurrency=20&refreshRoster=0",
       "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/nba/odds/sync-daily",
-      "schedule": "0 15 * * *"
     }
   ]
 }

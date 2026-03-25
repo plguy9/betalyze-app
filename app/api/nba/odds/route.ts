@@ -1121,10 +1121,10 @@ function formatDecimalOdd(value: number | null | undefined): string | null {
 function metricFromTheOddsMarketKey(rawKey: string | null | undefined): string | null {
   const key = String(rawKey ?? "").toLowerCase();
   if (!key) return null;
-  if (key === "player_points" || key === "player_points_alternate") return "Points";
-  if (key === "player_rebounds" || key === "player_rebounds_alternate") return "Rebounds";
-  if (key === "player_assists" || key === "player_assists_alternate") return "Assists";
-  if (key === "player_threes" || key === "player_threes_alternate") return "3PM";
+  if (key === "player_points" || key === "player_points_alternate") return "PTS";
+  if (key === "player_rebounds" || key === "player_rebounds_alternate") return "REB";
+  if (key === "player_assists" || key === "player_assists_alternate") return "AST";
+  if (key === "player_threes" || key === "player_threes_alternate") return "3PT";
   if (
     key === "player_points_rebounds_assists" ||
     key === "player_points_rebounds_assists_alternate"

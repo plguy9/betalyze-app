@@ -159,9 +159,9 @@ export function BestPropsSection({
               opp?.code ?? opp?.name ?? (p.homeCode && p.homeCode !== "—" ? p.homeCode : "—");
             const oppDisplay = oppLabel === "—" ? "?" : oppLabel;
             const primary = getTeamPrimaryColor(p.awayCode);
-            const isTopGrade = p.grade === "A+" || p.grade === "A";
-            const gradientOpacity = isTopGrade ? 0.22 : p.grade.startsWith("B") ? 0.15 : 0.10;
-            const borderOpacity = isTopGrade ? 0.50 : p.grade.startsWith("B") ? 0.35 : 0.22;
+            const isTopGrade = p.grade === "S" || p.grade === "A";
+            const gradientOpacity = isTopGrade ? 0.22 : p.grade === "B" ? 0.15 : 0.10;
+            const borderOpacity = isTopGrade ? 0.50 : p.grade === "B" ? 0.35 : 0.22;
             const sideLabel = p.side === "over" ? "Over" : "Under";
             const matchTime =
               Number.isFinite(Number(p.gameId ?? NaN)) && Number(p.gameId) > 0
@@ -195,7 +195,7 @@ export function BestPropsSection({
                 style={{
                   background: `linear-gradient(135deg, ${hexToRgba(primary, gradientOpacity)} 0%, rgba(5,5,8,.97) 60%)`,
                   borderColor: hexToRgba(primary, borderOpacity),
-                  boxShadow: `inset 3px 0 0 ${hexToRgba(primary, isTopGrade ? 0.70 : p.grade.startsWith("B") ? 0.50 : 0.35)}`,
+                  boxShadow: `inset 3px 0 0 ${hexToRgba(primary, isTopGrade ? 0.70 : p.grade === "B" ? 0.50 : 0.35)}`,
                 }}
               >
                 {/* Top row: grade + matchup */}

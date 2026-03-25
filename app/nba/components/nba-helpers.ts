@@ -159,19 +159,20 @@ export function normalizeBookmakerQueryValue(value: string | null | undefined): 
 }
 
 export function gradeTone(grade: string | null | undefined): string {
-  const g = String(grade ?? "").toUpperCase();
-  if (g.startsWith("A")) return "bg-emerald-500/15 text-emerald-200 ring-emerald-400/40";
-  if (g.startsWith("B")) return "bg-sky-500/15 text-sky-200 ring-sky-400/40";
-  if (g.startsWith("C")) return "bg-amber-500/15 text-amber-200 ring-amber-400/40";
-  return "bg-rose-500/15 text-rose-200 ring-rose-400/40";
+  const g = String(grade ?? "").toUpperCase().trim();
+  if (g === "S") return "bg-amber-500/20 text-amber-300 ring-amber-400/60";
+  if (g === "A") return "bg-emerald-500/15 text-emerald-200 ring-emerald-400/40";
+  if (g === "B") return "bg-sky-500/15 text-sky-200 ring-sky-400/40";
+  if (g === "C") return "bg-white/8 text-white/40 ring-white/15";
+  return "bg-rose-500/10 text-rose-300/60 ring-rose-400/20";
 }
 
 export function gradeSortRank(grade: string | null | undefined): number {
   const g = String(grade ?? "").trim().toUpperCase();
-  if (g === "A+") return 10; if (g === "A") return 9; if (g === "A-") return 8;
-  if (g === "B+") return 7; if (g === "B") return 6; if (g === "B-") return 5;
-  if (g === "C+") return 4; if (g === "C") return 3; if (g === "C-") return 2;
-  if (g === "D") return 1;
+  if (g === "S") return 5;
+  if (g === "A") return 4;
+  if (g === "B") return 3;
+  if (g === "C") return 2;
   return 0;
 }
 

@@ -92,7 +92,7 @@ export function DashboardSection({
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
 
   // ── Seuil "bonne bet" : B et au-dessus ──
-  const RECOMMENDED_GRADES = new Set(["A+", "A", "A-", "B+", "B"]);
+  const RECOMMENDED_GRADES = new Set(["S", "A", "B"]);
   const recommendedProps = topProps.filter((p) => RECOMMENDED_GRADES.has(String(p.grade ?? "")));
 
   // ── Computed data ──
@@ -110,7 +110,7 @@ export function DashboardSection({
     acc[g] = (acc[g] ?? 0) + 1;
     return acc;
   }, {});
-  const gradeOrder = ["A", "B", "C", "D"];
+  const gradeOrder = ["S", "A", "B", "C", "F"];
   const gradeDist = gradeOrder
     .filter((g) => (gradeGroups[g] ?? 0) > 0)
     .map((g) => ({ grade: g, count: gradeGroups[g] ?? 0 }));

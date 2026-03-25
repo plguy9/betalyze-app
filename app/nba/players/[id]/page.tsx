@@ -498,43 +498,11 @@ const stdDev = (values: number[]) => {
 const round1 = (val: number) => Math.round(val * 10) / 10;
 
 function gradeFromScore(score: number) {
-  if (score >= 90) return { label: "A+", tone: "emerald" as const };
-  if (score >= 85) return { label: "A", tone: "emerald" as const };
-  if (score >= 80) return { label: "A-", tone: "emerald" as const };
-  if (score >= 75) return { label: "B+", tone: "sky" as const };
-  if (score >= 70) return { label: "B", tone: "sky" as const };
-  if (score >= 65) return { label: "B-", tone: "sky" as const };
-  if (score >= 60) return { label: "C+", tone: "amber" as const };
-  if (score >= 55) return { label: "C", tone: "amber" as const };
-  if (score >= 50) return { label: "C-", tone: "amber" as const };
-  if (score >= 40) return { label: "D", tone: "rose" as const };
+  if (score >= 93) return { label: "S", tone: "amber" as const };
+  if (score >= 80) return { label: "A", tone: "emerald" as const };
+  if (score >= 67) return { label: "B", tone: "sky" as const };
+  if (score >= 52) return { label: "C", tone: "amber" as const };
   return { label: "F", tone: "rose" as const };
-}
-
-function gradeFromTrendSignals(params: {
-  score: number;
-  hitPct: number;
-  sampleSize: number;
-  cv: number;
-}) {
-  const { score, hitPct, sampleSize, cv } = params;
-
-  if (hitPct >= 74 && sampleSize >= 8 && cv <= 0.28 && score >= 86) {
-    return { label: "A+", tone: "emerald" as const };
-  }
-  if (hitPct >= 68 && sampleSize >= 7 && cv <= 0.33 && score >= 80) {
-    return { label: "A", tone: "emerald" as const };
-  }
-  if (hitPct >= 62 && sampleSize >= 6 && cv <= 0.38 && score >= 74) {
-    return { label: "A-", tone: "emerald" as const };
-  }
-
-  let cappedScore = score;
-  if (hitPct < 52) cappedScore = Math.min(cappedScore, 62); // C+
-  else if (hitPct < 56) cappedScore = Math.min(cappedScore, 69); // B-
-  if (sampleSize < 6) cappedScore = Math.min(cappedScore, 72); // B
-
-  return gradeFromScore(cappedScore);
 }
 
 function splitName(name: string) {
@@ -1822,12 +1790,7 @@ function PlayerPageInner() {
       consistencyEdge +
       sampleEdge;
     const score = Math.round(clamp(rawScore, 0, 100));
-    const grade = gradeFromTrendSignals({
-      score,
-      hitPct: noteHitPct,
-      sampleSize: series.length,
-      cv,
-    });
+    const grade = gradeFromScore(score);
     const lineDeltaPct = line > 0 ? Math.round(((Number(noteAvg) - line) / line) * 100) : null;
     return {
       score,

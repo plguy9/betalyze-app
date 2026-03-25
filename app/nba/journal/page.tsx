@@ -321,10 +321,11 @@ function toneRing(grade: string | null, tone: JournalTone) {
   const normalized = String(grade ?? "")
     .trim()
     .toUpperCase();
+  if (normalized === "S") return "border-amber-500/40";
   if (normalized.startsWith("A")) return "border-emerald-500/40";
   if (normalized.startsWith("B")) return "border-sky-500/40";
   if (normalized.startsWith("C")) return "border-orange-500/40";
-  if (normalized.startsWith("D") || normalized.startsWith("F")) return "border-rose-500/40";
+  if (normalized.startsWith("F")) return "border-rose-500/40";
   if (tone === "red") return "border-rose-500/40";
   if (tone === "blue") return "border-sky-500/40";
   if (tone === "green") return "border-emerald-500/40";
@@ -346,10 +347,11 @@ function gradeGlow(grade: string | null, tone: JournalTone) {
   const normalized = String(grade ?? "")
     .trim()
     .toUpperCase();
+  if (normalized === "S") return "from-amber-500/18";
   if (normalized.startsWith("A")) return "from-emerald-500/18";
   if (normalized.startsWith("B")) return "from-sky-500/18";
   if (normalized.startsWith("C")) return "from-orange-500/16";
-  if (normalized.startsWith("D") || normalized.startsWith("F")) return "from-rose-500/18";
+  if (normalized.startsWith("F")) return "from-rose-500/18";
   if (tone === "red") return "from-rose-500/14";
   if (tone === "blue") return "from-sky-500/14";
   if (tone === "green") return "from-emerald-500/14";
@@ -362,10 +364,11 @@ function gradePillClass(grade: string | null) {
   const normalized = String(grade ?? "")
     .trim()
     .toUpperCase();
+  if (normalized === "S") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
   if (normalized.startsWith("A")) return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   if (normalized.startsWith("B")) return "border-sky-500/25 bg-sky-500/10 text-sky-200";
   if (normalized.startsWith("C")) return "border-orange-500/25 bg-orange-500/10 text-orange-200";
-  if (normalized.startsWith("D") || normalized.startsWith("F")) {
+  if (normalized.startsWith("F")) {
     return "border-rose-500/25 bg-rose-500/10 text-rose-200";
   }
   return "border-white/15 bg-white/5 text-white/75";
@@ -901,7 +904,7 @@ export default function NbaBetJournalPage() {
       const grade = String(item.grade ?? "")
         .trim()
         .toUpperCase();
-      return grade.startsWith("A");
+      return grade === "S" || grade === "A";
     });
     const highGradeWins = highGradeSettled.filter((item) => item.result === "W").length;
     const highGradeWinRate = highGradeSettled.length

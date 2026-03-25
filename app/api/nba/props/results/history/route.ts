@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const GRADE_ORDER = ["A+", "A", "A-", "B+", "B"];
+const GRADE_ORDER = ["S", "A", "B"];
 
 export async function GET() {
   try {

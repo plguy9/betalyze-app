@@ -93,8 +93,8 @@ export type PropResultsPayload = {
   streak: { type: "win" | "loss"; count: number } | null;
 };
 
-const GRADE_ORDER = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
-const RECOMMENDED_GRADES = new Set(["A+", "A", "A-", "B+", "B"]);
+const GRADE_ORDER = ["S", "A", "B", "C"];
+const RECOMMENDED_GRADES = new Set(["S", "A", "B"]);
 
 export async function GET(req: Request) {
   try {

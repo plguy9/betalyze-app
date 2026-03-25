@@ -30,16 +30,15 @@ type Props = {
 };
 
 const GRADE_HIT_RATE: Record<string, number> = {
-  "A+": 87, A: 79, "B+": 73, B: 66, "C+": 60, C: 54,
+  S: 87, A: 79, B: 66, C: 54,
 };
 
 function gradeStyle(grade: string): { bg: string; color: string } {
-  if (grade === "A+") return { bg: "rgba(245,158,11,.20)", color: "#fbbf24" };
-  if (grade === "A")  return { bg: "rgba(245,158,11,.13)", color: "#fcd34d" };
-  if (grade === "A-") return { bg: "rgba(234,179,8,.12)",  color: "#fde047" };
-  if (grade === "B+") return { bg: "rgba(52,211,153,.12)", color: "#6ee7b7" };
-  if (grade === "B")  return { bg: "rgba(52,211,153,.08)", color: "#a7f3d0" };
-  return { bg: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.40)" };
+  if (grade === "S") return { bg: "rgba(245,158,11,.20)", color: "#fbbf24" };
+  if (grade === "A") return { bg: "rgba(52,211,153,.15)", color: "#6ee7b7" };
+  if (grade === "B") return { bg: "rgba(56,189,248,.12)", color: "#7dd3fc" };
+  if (grade === "C") return { bg: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.40)" };
+  return { bg: "rgba(244,63,94,.10)", color: "rgba(251,113,133,.60)" };
 }
 
 const RANK_ACCENT = [
@@ -282,7 +281,7 @@ export function PlayersSection({ teamMetaByCode: _teamMetaByCode }: Props) {
                 : hitRate >= 70 ? "rgba(255,177,74,.65)"
                 : hitRate >= 60 ? "rgba(251,146,60,.65)"
                 : "rgba(255,255,255,.12)";
-              const isTopGrade = prop.grade === "A+" || prop.grade === "A";
+              const isTopGrade = prop.grade === "S" || prop.grade === "A";
               const playerHref = prop.playerId ? `/nba/players/${prop.playerId}` : null;
               const edgePositive = prop.edge > 0;
 

@@ -631,38 +631,12 @@ function dedupeLogsByGame(rows: LogRow[]): LogRow[] {
   return sortTrendLogs(Array.from(byGame.values()));
 }
 
-function baseGradeFromScore(score: number) {
-  if (score >= 90) return "A+";
-  if (score >= 85) return "A";
-  if (score >= 80) return "A-";
-  if (score >= 75) return "B+";
-  if (score >= 70) return "B";
-  if (score >= 65) return "B-";
-  if (score >= 60) return "C+";
-  if (score >= 55) return "C";
-  if (score >= 50) return "C-";
-  if (score >= 40) return "D";
+function gradeFromScore(score: number): string {
+  if (score >= 93) return "S";
+  if (score >= 80) return "A";
+  if (score >= 67) return "B";
+  if (score >= 52) return "C";
   return "F";
-}
-
-function gradeFromSignals(params: {
-  score: number;
-  hitPct: number;
-  sampleSize: number;
-  cv: number;
-}) {
-  const { score, hitPct, sampleSize, cv } = params;
-  // Keep exactly the same grading gates as the player profile card.
-  if (hitPct >= 74 && sampleSize >= 8 && cv <= 0.28 && score >= 86) return "A+";
-  if (hitPct >= 68 && sampleSize >= 7 && cv <= 0.33 && score >= 80) return "A";
-  if (hitPct >= 62 && sampleSize >= 6 && cv <= 0.38 && score >= 74) return "A-";
-
-  let cappedScore = score;
-  if (hitPct < 52) cappedScore = Math.min(cappedScore, 62);
-  else if (hitPct < 56) cappedScore = Math.min(cappedScore, 69);
-  if (sampleSize < 6) cappedScore = Math.min(cappedScore, 72); // B
-
-  return baseGradeFromScore(cappedScore);
 }
 
 function torontoTodayYmd() {
@@ -1502,12 +1476,7 @@ export async function GET(req: NextRequest) {
             restDaysEdgeVal * sideMultiplier +
             splitEdgeVal * sideMultiplier;
           const score = Math.round(clamp(rawScore, 0, 100));
-          const grade = gradeFromSignals({
-            score,
-            hitPct: noteHitPct,
-            sampleSize: values.length,
-            cv,
-          });
+          const grade = gradeFromScore(score);
 
           propsAnalyzed += 1;
           return {
@@ -1611,18 +1580,6 @@ export async function GET(req: NextRequest) {
       }
       return output;
     };
-    const enforceGradeCapsPerGame = (picks: TopProp[]) => {
-      let aPlusCount = 0;
-      return picks.map((pick) => {
-        if (pick.grade !== "A+") return pick;
-        if (aPlusCount === 0) {
-          aPlusCount += 1;
-          return pick;
-        }
-        return { ...pick, grade: "A" };
-      });
-    };
-
     const props =
       alternatesBestMode
         ? (
@@ -1640,16 +1597,11 @@ export async function GET(req: NextRequest) {
             .sort(sortAlternates)
             .slice(0, alternatesLimit)
         : selectedGameId !== null
-          ? enforceGradeCapsPerGame(
-              dedupeByPlayerMetric([...(picksByGame.get(selectedGameId) ?? [])])
-                .sort(sortProps),
-            )
+          ? dedupeByPlayerMetric([...(picksByGame.get(selectedGameId) ?? [])]).sort(sortProps)
           : Array.from(picksByGame.entries())
               .sort((a, b) => a[0] - b[0])
               .flatMap(([, picks]) =>
-                enforceGradeCapsPerGame(
-                  dedupeByPlayerMetric([...picks]).sort(sortProps),
-                ),
+                dedupeByPlayerMetric([...picks]).sort(sortProps),
               );
 
     const payload: CachedTopPropsPayload = {

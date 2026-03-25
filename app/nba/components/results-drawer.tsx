@@ -98,7 +98,7 @@ function ResultRow({ r, oddsFormat }: { r: PropResult; oddsFormat: OddsDisplayFo
   );
 }
 
-const GRADES = ["A+", "A", "A-", "B+", "B"];
+const GRADES = ["S", "A", "B"];
 
 function HistoryView() {
   const [hist, setHist] = useState<HistoryPayload | null>(null);

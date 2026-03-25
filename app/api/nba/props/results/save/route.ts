@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { readNbaTopPropsDailyCache } from "@/lib/supabase/nba-top-props-cache";
 
 const QUERY_TIMEZONE = "America/Toronto";
-const GRADE_ORDER = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
-const RECOMMENDED_GRADES = new Set(["A+", "A", "A-", "B+", "B"]);
+const GRADE_ORDER = ["S", "A", "B", "C"];
+const RECOMMENDED_GRADES = new Set(["S", "A", "B"]);
 
 function getYesterdayToronto(): string {
   const fmt = new Intl.DateTimeFormat("en-CA", {

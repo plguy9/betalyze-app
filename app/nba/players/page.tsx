@@ -334,7 +334,7 @@ export default function NbaPlayersPage() {
   // Hit Rate: top 8 props by score, with hit rate derived from grade
   const hitRateProps = useMemo(() => {
     const gradeToHitRate: Record<string, number> = {
-      "A+": 87, A: 79, "B+": 73, B: 66, "C+": 60, C: 54,
+      S: 87, A: 79, B: 66, C: 54,
     };
     return [...topPropsDisplay]
       .sort((a, b) => b.finalScore - a.finalScore)

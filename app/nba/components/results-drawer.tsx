@@ -165,6 +165,7 @@ function HistoryView() {
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
                 <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
                 <th className="px-2 py-2 text-center font-medium text-white/30">Mtch</th>
+                <th className="px-2 py-2 text-center font-medium text-white/30">Props</th>
                 {GRADES.map((g) => (
                   <th key={g} className="px-2 py-2 text-center font-medium text-white/30">{g}</th>
                 ))}
@@ -179,6 +180,7 @@ function HistoryView() {
                 >
                   <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
                   <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.games || "—"}</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.totalPicks}</td>
                   {GRADES.map((g) => {
                     const gd = row.grades[g];
                     return (

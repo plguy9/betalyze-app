@@ -23,7 +23,6 @@ import type {
   NbaTopPropsApiPayload,
   PlayersResponse,
 } from "@/app/nba/components/nba-shared-types";
-import { ResultsDrawer } from "@/app/nba/components/results-drawer";
 
 const MAX_SUGGESTIONS = 10;
 
@@ -655,7 +654,6 @@ export default function NbaPlayersPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ResultsDrawer oddsFormat={oddsFormat} />
               <select
                 value={topPropsGameFilter}
                 onChange={(event) => setTopPropsGameFilter(event.target.value)}

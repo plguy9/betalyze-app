@@ -876,12 +876,20 @@ function NbaPageInner() {
       if (topPropsOu === "UNDER") return item.side === "under";
       return true;
     });
-    return [...filtered].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       if (topPropsSortBy === "EDGE") return b.edge - a.edge;
       const gradeDiff = gradeSortRank(b.grade) - gradeSortRank(a.grade);
       if (gradeDiff !== 0) return gradeDiff;
       if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
       return b.edge - a.edge;
+    });
+    // 1 prop per player — keep only the best-scoring prop
+    const seen = new Set<string>();
+    return sorted.filter((p) => {
+      const key = p.player.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
   }, [topProps, topPropsGameFilter, topPropsOu, topPropsSortBy, finishedGameIds]);
 

@@ -1,7 +1,7 @@
 {
   "season": "2025",
-  "updatedAt": "2026-03-17T19:45:03.581Z",
-  "count": 625,
+  "updatedAt": "2026-03-25T09:25:23.321Z",
+  "count": 626,
   "players": [
     {
       "id": 236,
@@ -7794,8 +7794,8 @@
       "firstName": "C.",
       "lastName": "Youngblood",
       "fullName": "C. Youngblood",
-      "teamId": 25,
-      "teamName": "Oklahoma City Thunder",
+      "teamId": 29,
+      "teamName": "Portland Trail Blazers",
       "teamCode": null,
       "position": null,
       "jerseyNumber": null,
@@ -8270,8 +8270,8 @@
       "firstName": "Kennedy",
       "lastName": "Chandler",
       "fullName": "Kennedy Chandler",
-      "teamId": 27,
-      "teamName": "Philadelphia 76ers",
+      "teamId": 40,
+      "teamName": "Utah Jazz",
       "teamCode": null,
       "position": "G",
       "jerseyNumber": "1",
@@ -9759,6 +9759,23 @@
       "height": "2.16",
       "weight": "111.1",
       "birthDate": "1995-10-15",
+      "isActive": true
+    },
+    {
+      "id": 779,
+      "firstName": "Markelle",
+      "lastName": "Fultz",
+      "fullName": "Markelle Fultz",
+      "teamId": 38,
+      "teamName": "Toronto Raptors",
+      "teamCode": null,
+      "position": "G",
+      "jerseyNumber": "20",
+      "age": null,
+      "nationality": "USA",
+      "height": "1.93",
+      "weight": "94.8",
+      "birthDate": "1998-05-29",
       "isActive": true
     },
     {

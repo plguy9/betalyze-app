@@ -14,6 +14,7 @@ import {
   getNbaCdnTeamLogo,
 } from "@/lib/nba/constants";
 import { DashboardSection } from "@/app/nba/components/dashboard-section";
+import { ResultsDrawer } from "@/app/nba/components/results-drawer";
 import { BestPropsSection } from "@/app/nba/components/best-props-section";
 import { GamesSlateSection } from "@/app/nba/components/games-slate-section";
 import { DvpSection } from "@/app/nba/components/dvp-section";
@@ -1137,6 +1138,7 @@ function NbaPageInner() {
                   <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Players</h1>
                   <p className="mt-0.5 text-[13px] text-white/40">Stats & matchups · NBA</p>
                 </div>
+                <ResultsDrawer oddsFormat={oddsFormat} />
               </div>
             )}
 

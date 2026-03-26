@@ -16,7 +16,6 @@ import {
 import { TOP_PROPS_PAGE_SIZE } from "@/lib/nba/constants";
 import type { NbaTopProp, BetalyzeNbaTeam } from "./nba-shared-types";
 import type { NbaSidebarPage } from "./nba-sidebar";
-import { ResultsDrawer } from "./results-drawer";
 
 type Props = {
   topPropsPagedDisplay: NbaTopProp[];
@@ -121,7 +120,6 @@ export function BestPropsSection({
                 { value: "EDGE", label: "Edge" },
               ]}
             />
-            <ResultsDrawer oddsFormat={oddsFormat} />
           </div>
         </div>
 

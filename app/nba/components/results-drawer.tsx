@@ -99,16 +99,29 @@ function ResultRow({ r, oddsFormat }: { r: PropResult; oddsFormat: OddsDisplayFo
 }
 
 const GRADES = ["S", "A", "B"];
+const METRICS = ["ALL", "PTS", "REB", "AST", "3PT", "PRA"] as const;
+type MetricFilter = typeof METRICS[number];
+
+type MetricsPayload = {
+  ok: boolean;
+  globalByMetric: { metric: string; hits: number; total: number; hitRate: number }[];
+  dates: { date: string; games: number; metrics: Record<string, { hits: number; total: number; hit_rate: number }> }[];
+};
 
 function HistoryView() {
   const [hist, setHist] = useState<HistoryPayload | null>(null);
+  const [metricsData, setMetricsData] = useState<MetricsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [metricFilter, setMetricFilter] = useState<MetricFilter>("ALL");
 
   useEffect(() => {
     fetch("/api/nba/props/results/history")
       .then((r) => r.json())
       .then((json) => { if (json.ok) setHist(json); })
       .finally(() => setLoading(false));
+    fetch("/api/nba/props/results/history/metrics")
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setMetricsData(json); });
   }, []);
 
   if (loading) return (
@@ -126,22 +139,39 @@ function HistoryView() {
     </div>
   );
 
+  // Seulement les dates avec grade S (nouveau algo)
+  const filteredDates = hist.dates.filter((d) => d.grades["S"] !== undefined);
+
+  // Stats globales filtrées sur les dates avec S
+  const filteredGlobalByGrade = GRADES.map((grade) => {
+    let hits = 0, total = 0;
+    for (const d of filteredDates) {
+      const gd = d.grades[grade];
+      if (gd) { hits += gd.hits; total += gd.total; }
+    }
+    return { grade, hits, total, hitRate: total > 0 ? Math.round((hits / total) * 100) : 0 };
+  }).filter((g) => g.total > 0);
+
+  const filteredTotalHits = filteredDates.reduce((s, d) => s + d.totalHits, 0);
+  const filteredTotalPicks = filteredDates.reduce((s, d) => s + d.totalPicks, 0);
+  const filteredOverallHitRate = filteredTotalPicks > 0 ? Math.round((filteredTotalHits / filteredTotalPicks) * 100) : 0;
+
   return (
     <div className="space-y-5">
       {/* Global par grade */}
       <div>
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">
-          Global · {hist.daysTracked} soirs · {hist.totalPicks} picks
+          Global · {filteredDates.length} soirs · {filteredTotalPicks} picks
         </p>
         <div className="space-y-2.5">
-          {hist.globalByGrade.map((g) => (
+          {filteredGlobalByGrade.map((g) => (
             <GradeBar key={g.grade} g={g} />
           ))}
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="flex flex-col items-center justify-center rounded-xl py-2.5" style={{ background: "rgba(255,255,255,.04)" }}>
             <p className="text-[9px] uppercase tracking-wider text-white/30">Global</p>
-            <p className="mt-0.5 text-[16px] font-black" style={{ color: hitRateColor(hist.overallHitRate) }}>{hist.overallHitRate}%</p>
+            <p className="mt-0.5 text-[16px] font-black" style={{ color: hitRateColor(filteredOverallHitRate) }}>{filteredOverallHitRate}%</p>
           </div>
           <div className="flex flex-col items-center justify-center rounded-xl py-2.5" style={{ background: "rgba(255,255,255,.04)" }}>
             <p className="text-[9px] uppercase tracking-wider text-white/30">Over</p>
@@ -158,51 +188,115 @@ function HistoryView() {
 
       {/* Tableau par date */}
       <div>
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Par date</p>
-        <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid rgba(255,255,255,.07)" }}>
-          <table className="w-full text-[11px]">
-            <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
-                <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
-                <th className="px-2 py-2 text-center font-medium text-white/30">Mtch</th>
-                <th className="px-2 py-2 text-center font-medium text-white/30">Props</th>
-                {GRADES.map((g) => (
-                  <th key={g} className="px-2 py-2 text-center font-medium text-white/30">{g}</th>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/25">Par date</p>
+          {/* Sélecteur de marché */}
+          <div className="flex gap-1">
+            {METRICS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetricFilter(m)}
+                className="rounded-md px-2 py-0.5 text-[10px] font-semibold transition"
+                style={{
+                  background: metricFilter === m ? "rgba(245,158,11,.18)" : "rgba(255,255,255,.05)",
+                  color: metricFilter === m ? "#f59e0b" : "rgba(255,255,255,.35)",
+                  border: `1px solid ${metricFilter === m ? "rgba(245,158,11,.3)" : "rgba(255,255,255,.08)"}`,
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {metricFilter === "ALL" ? (
+          <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid rgba(255,255,255,.07)" }}>
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
+                  <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
+                  <th className="px-2 py-2 text-center font-medium text-white/30">Mtch</th>
+                  <th className="px-2 py-2 text-center font-medium text-white/30">Props</th>
+                  {GRADES.map((g) => (
+                    <th key={g} className="px-2 py-2 text-center font-medium text-white/30">{g}</th>
+                  ))}
+                  <th className="px-3 py-2 text-right font-medium text-white/30">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDates.map((row, i) => (
+                  <tr
+                    key={row.date}
+                    style={{ borderBottom: i < filteredDates.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}
+                  >
+                    <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
+                    <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.games || "—"}</td>
+                    <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.totalPicks}</td>
+                    {GRADES.map((g) => {
+                      const gd = row.grades[g];
+                      return (
+                        <td key={g} className="px-2 py-2 text-center tabular-nums">
+                          {gd ? (
+                            <span style={{ color: hitRateColor(gd.hit_rate) }}>
+                              {gd.hits}/{gd.total}
+                            </span>
+                          ) : (
+                            <span className="text-white/15">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2 text-right font-semibold" style={{ color: hitRateColor(row.hitRate) }}>
+                      {row.hitRate}%
+                    </td>
+                  </tr>
                 ))}
-                <th className="px-3 py-2 text-right font-medium text-white/30">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hist.dates.map((row, i) => (
-                <tr
-                  key={row.date}
-                  style={{ borderBottom: i < hist.dates.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}
-                >
-                  <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
-                  <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.games || "—"}</td>
-                  <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.totalPicks}</td>
-                  {GRADES.map((g) => {
-                    const gd = row.grades[g];
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Vue par marché */
+          metricsData && metricsData.dates.length > 0 ? (
+            <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid rgba(255,255,255,.07)" }}>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(255,255,255,.03)" }}>
+                    <th className="px-3 py-2 text-left font-medium text-white/30">Date</th>
+                    <th className="px-2 py-2 text-center font-medium text-white/30">Mtch</th>
+                    <th className="px-2 py-2 text-center font-medium" style={{ color: "#f59e0b" }}>{metricFilter}</th>
+                    <th className="px-3 py-2 text-right font-medium text-white/30">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricsData.dates.map((row, i) => {
+                    const md = row.metrics[metricFilter];
+                    if (!md) return null;
                     return (
-                      <td key={g} className="px-2 py-2 text-center tabular-nums">
-                        {gd ? (
-                          <span style={{ color: hitRateColor(gd.hit_rate) }}>
-                            {gd.hits}/{gd.total}
-                          </span>
-                        ) : (
-                          <span className="text-white/15">—</span>
-                        )}
-                      </td>
+                      <tr
+                        key={row.date}
+                        style={{ borderBottom: i < metricsData.dates.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}
+                      >
+                        <td className="px-3 py-2 text-white/50">{row.date.slice(5)}</td>
+                        <td className="px-2 py-2 text-center tabular-nums text-white/30">{row.games || "—"}</td>
+                        <td className="px-2 py-2 text-center tabular-nums" style={{ color: hitRateColor(md.hit_rate) }}>
+                          {md.hits}/{md.total}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold" style={{ color: hitRateColor(md.hit_rate) }}>
+                          {md.hit_rate}%
+                        </td>
+                      </tr>
                     );
                   })}
-                  <td className="px-3 py-2 text-right font-semibold" style={{ color: hitRateColor(row.hitRate) }}>
-                    {row.hitRate}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/8 p-4 text-center">
+              <p className="text-[12px] text-white/30">Aucune donnée par marché — relance le save pour les dates historiques.</p>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

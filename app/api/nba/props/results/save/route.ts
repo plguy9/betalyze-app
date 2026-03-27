@@ -133,8 +133,9 @@ export async function GET(req: NextRequest) {
       );
       const gamesCount = Number(gamesResult[0]?.games ?? 0);
 
-      // Calcul résultats par grade + over/under
+      // Calcul résultats par grade + over/under + marché
       const gradeMap = new Map<string, { hits: number; total: number; roiSum: number; overHits: number; overTotal: number; underHits: number; underTotal: number }>();
+      const metricMap = new Map<string, { hits: number; total: number }>();
 
       for (const prop of props) {
         if (!prop.playerId || !Number.isFinite(prop.playerId)) continue;
@@ -163,6 +164,12 @@ export async function GET(req: NextRequest) {
           if (isHit) g.underHits++;
         }
         gradeMap.set(prop.grade, g);
+
+        // Par marché
+        const m = metricMap.get(prop.metric) ?? { hits: 0, total: 0 };
+        m.total++;
+        if (isHit) m.hits++;
+        metricMap.set(prop.metric, m);
       }
 
       // Upsert dans la table
@@ -189,6 +196,22 @@ export async function GET(req: NextRequest) {
             updated_at = now()
         `;
         savedGrades++;
+      }
+
+      // Upsert par marché
+      for (const [metric, m] of metricMap) {
+        if (m.total === 0) continue;
+        const hitRate = Math.round((m.hits / m.total) * 100);
+        await prisma.$executeRaw`
+          INSERT INTO nba_picks_results_daily_metric (date, metric, hits, total, hit_rate, games, updated_at)
+          VALUES (${date}, ${metric}, ${m.hits}, ${m.total}, ${hitRate}, ${gamesCount}, now())
+          ON CONFLICT (date, metric) DO UPDATE SET
+            hits = EXCLUDED.hits,
+            total = EXCLUDED.total,
+            hit_rate = EXCLUDED.hit_rate,
+            games = EXCLUDED.games,
+            updated_at = now()
+        `;
       }
 
       saved.push({ date, grades: savedGrades });

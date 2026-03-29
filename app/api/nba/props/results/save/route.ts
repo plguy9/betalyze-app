@@ -96,7 +96,17 @@ export async function GET(req: NextRequest) {
         score: number;
       };
 
-      const props = cached.payload.props as CachedProp[];
+      const allProps = cached.payload.props as CachedProp[];
+      // Dedup: 1 prop per player (best score), same logic as display
+      const seenPlayers = new Set<string>();
+      const props = [...allProps]
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .filter((p) => {
+          const key = String(p.player ?? "").toLowerCase().trim();
+          if (!key || seenPlayers.has(key)) return false;
+          seenPlayers.add(key);
+          return true;
+        });
 
       const playerIds = [
         ...new Set(

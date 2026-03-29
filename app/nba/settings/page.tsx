@@ -63,11 +63,11 @@ const BOOKMAKER_OPTIONS = [
   { value: "fanduel", label: "FanDuel" },
   { value: "draftkings", label: "DraftKings" },
   { value: "betmgm", label: "BetMGM" },
-  { value: "caesars", label: "Caesars" },
-  { value: "espnbet", label: "ESPN BET" },
-  { value: "bet365", label: "bet365" },
-  { value: "pointsbet", label: "PointsBet" },
-  { value: "pinnacle", label: "Pinnacle" },
+  { value: "williamhill_us", label: "Caesars" },
+  { value: "espnbet", label: "theScore Bet" },
+  { value: "betrivers", label: "BetRivers" },
+  { value: "fanatics", label: "Fanatics" },
+  { value: "betonlineag", label: "BetOnline.ag" },
 ];
 
 const TIMEZONE_OPTIONS = [

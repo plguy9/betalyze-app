@@ -71,7 +71,6 @@ export function BestPropsSection({
   journalAddedId,
   teamMetaByCode,
   gameTimeById,
-  sidebarActive,
   oddsFormat,
 }: Props) {
   const router = useRouter();
@@ -269,6 +268,54 @@ export function BestPropsSection({
                       </span>
                     </div>
                   </div>
+
+                  {/* DVP row */}
+                  {(() => {
+                    const flag = p.dvpMetricFlag;
+                    const rank = p.dvpRank;
+                    const total = p.dvpTotalTeams ?? 30;
+                    const favorable = flag ? (flag === "weakness" && p.side === "over") || (flag === "strength" && p.side === "under") : false;
+                    const unfavorable = flag ? (flag === "strength" && p.side === "over") || (flag === "weakness" && p.side === "under") : false;
+                    const color = favorable ? "#34d399" : unfavorable ? "#fb7185" : "rgba(255,255,255,.25)";
+
+                    const segments = 5;
+                    const filledRaw = rank ? ((total - rank + 1) / total) * segments : 0;
+
+                    return (
+                      <div className="px-3 pb-2 pt-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-white/20">
+                            DEF{p.dvpPosition ? ` vs ${p.metric} ${p.dvpPosition}` : ""}
+                          </span>
+                          <div className="flex items-center gap-0.5">
+                            {Array.from({ length: segments }).map((_, i) => {
+                              const full = i < Math.floor(filledRaw);
+                              const half = !full && i === Math.floor(filledRaw) && (filledRaw % 1) >= 0.3;
+                              const bg = full
+                                ? color
+                                : half
+                                  ? `linear-gradient(to right, ${color} 50%, rgba(255,255,255,.08) 50%)`
+                                  : "rgba(255,255,255,.08)";
+                              return (
+                                <div
+                                  key={i}
+                                  className="h-2 w-3.5 rounded-sm"
+                                  style={{ background: bg }}
+                                />
+                              );
+                            })}
+                          </div>
+                          {rank ? (
+                            <span className="text-[10px] font-bold tabular-nums" style={{ color }}>
+                              #{rank}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-white/15">N/D</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Bottom row: edge + score + actions */}
@@ -406,10 +453,12 @@ export function BestPropsSection({
                 <p className="text-[11px] leading-relaxed text-white/50">
                   Évalue chaque pick selon plusieurs signaux propriétaires : forme récente du joueur, qualité du matchup défensif et valeur perçue des cotes. Plus le score est élevé, plus l'opportunité est jugée favorable.
                 </p>
-                <div className="mt-2.5 flex gap-2">
-                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">75+ Excellent</span>
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold text-amber-400">55–74 Bon</span>
-                  <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] font-semibold text-white/35">&lt;55 Faible</span>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[9px] font-semibold text-violet-400">S · 96+</span>
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">A · 84–95</span>
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold text-amber-400">B · 70–83</span>
+                  <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-semibold text-orange-400">C · 54–69</span>
+                  <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] font-semibold text-white/35">F · &lt;54</span>
                 </div>
               </div>
             </div>

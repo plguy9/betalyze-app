@@ -90,7 +90,7 @@ export type PropResultsPayload = {
   avgOddsHit: number | null;
   avgOddsMiss: number | null;
   bestOddsHit: { player: string; odds: number; metric: string; line: number; side: string } | null;
-  streak: { type: "win" | "loss"; count: number } | null;
+  units: number | null;
 };
 
 const GRADE_ORDER = ["S", "A", "B", "C"];
@@ -242,22 +242,13 @@ export async function GET(req: Request) {
       return best;
     }, null);
 
-    // Streak actuel (ordre grade A+ → B)
-    const sortedForStreak = [...results].sort((a, b) => {
-      const gi = (g: string) => GRADE_ORDER.indexOf(g);
-      return gi(a.grade) - gi(b.grade);
-    });
-    let streak: PropResultsPayload["streak"] = null;
-    if (sortedForStreak.length) {
-      const lastType = sortedForStreak[sortedForStreak.length - 1].result === "hit" ? "win" : "loss";
-      let count = 0;
-      for (let i = sortedForStreak.length - 1; i >= 0; i--) {
-        const t = sortedForStreak[i].result === "hit" ? "win" : "loss";
-        if (t !== lastType) break;
-        count++;
-      }
-      streak = { type: lastType, count };
-    }
+    // Flat betting units (P&L): hit = +(odds-1)u, miss = -1u
+    const units = totalProps > 0
+      ? Math.round(results.reduce((sum, r) => {
+          const o = r.odds !== null && Number.isFinite(r.odds) ? r.odds : 1.9;
+          return sum + (r.result === "hit" ? o - 1 : -1);
+        }, 0) * 100) / 100
+      : null;
 
     return NextResponse.json({
       ok: true,
@@ -275,7 +266,7 @@ export async function GET(req: Request) {
       avgOddsHit,
       avgOddsMiss,
       bestOddsHit,
-      streak,
+      units,
     } satisfies PropResultsPayload);
   } catch (err) {
     console.error("[props/results]", err);

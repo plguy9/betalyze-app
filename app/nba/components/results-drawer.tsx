@@ -460,9 +460,9 @@ export function ResultsDrawer({ oddsFormat }: { oddsFormat: OddsDisplayFormat })
                     </p>
                   </div>
                   <div className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,.03)" }}>
-                    <p className="text-[9px] uppercase tracking-wider text-white/30">Streak</p>
-                    <p className="mt-0.5 text-[15px] font-bold tabular-nums" style={{ color: data.streak?.type === "win" ? "#4ade80" : "#fb7185" }}>
-                      {data.streak ? `${data.streak.type === "win" ? "🔥" : "❄️"} ${data.streak.count}` : "—"}
+                    <p className="text-[9px] uppercase tracking-wider text-white/30">Unités</p>
+                    <p className="mt-0.5 text-[15px] font-bold tabular-nums" style={{ color: data.units !== null ? (data.units >= 0 ? "#4ade80" : "#fb7185") : "rgba(255,255,255,.3)" }}>
+                      {data.units !== null ? `${data.units >= 0 ? "+" : ""}${data.units.toFixed(2)}u` : "—"}
                     </p>
                   </div>
                 </div>

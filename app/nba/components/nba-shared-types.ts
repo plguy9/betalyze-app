@@ -203,6 +203,11 @@ export type NbaTopProp = {
   hitRateL10?: number | null;
   restDaysEdge?: number | null;
   splitEdge?: number | null;
+  dvpRank?: number | null;
+  dvpTotalTeams?: number | null;
+  dvpMetricFlag?: "weakness" | "strength" | "neutral" | null;
+  dvpValue?: number | null;
+  dvpPosition?: string | null;
 };
 
 export type NbaTopPropsApiPayload = {
@@ -233,6 +238,11 @@ export type NbaTopPropsApiPayload = {
     impliedProbability?: number;
     modelEdge?: number;
     dvpScore?: number;
+    dvpRank?: number | null;
+    dvpTotalTeams?: number | null;
+    dvpMetricFlag?: "weakness" | "strength" | "neutral" | null;
+    dvpValue?: number | null;
+    dvpPosition?: string | null;
     consistencyScore?: number;
     recommendationScore?: number;
     recommendationTag?: "SAFE" | "BALANCED" | "AGGRESSIVE" | "LONGSHOT";

@@ -536,6 +536,56 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Save results for yesterday (after logs are refreshed) ─────────────────
+  let resultsSync: {
+    attempted: boolean;
+    ok: boolean;
+    status: number | null;
+    date: string | null;
+    grades: number | null;
+    error: string | null;
+  } = {
+    attempted: false,
+    ok: false,
+    status: null,
+    date: null,
+    grades: null,
+    error: null,
+  };
+  if (!skipLogs) {
+    try {
+      const resultsDate = logsRefreshSync.date ?? addDaysDateKey(dateKey, -1);
+      const resultsUrl = new URL("/api/nba/props/results/save", req.nextUrl.origin);
+      resultsUrl.searchParams.set("date", resultsDate);
+      if (cronSecret) resultsUrl.searchParams.set("secret", cronSecret);
+      resultsSync.attempted = true;
+      const resultsRes = await fetch(resultsUrl.toString(), { cache: "no-store" });
+      const resultsJson = (await resultsRes.json().catch(() => null)) as
+        | { ok?: boolean; saved?: Array<{ grades?: number }>; error?: string }
+        | null;
+      const gradesCount = Array.isArray(resultsJson?.saved)
+        ? resultsJson.saved.reduce((sum, r) => sum + (Number(r?.grades ?? 0)), 0)
+        : null;
+      resultsSync = {
+        attempted: true,
+        ok: resultsRes.ok && resultsJson?.ok === true,
+        status: resultsRes.status,
+        date: resultsDate,
+        grades: gradesCount,
+        error: resultsRes.ok ? null : `results save failed (${resultsRes.status})`,
+      };
+    } catch (err) {
+      resultsSync = {
+        attempted: true,
+        ok: false,
+        status: null,
+        date: null,
+        grades: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     cached: false,
@@ -548,5 +598,6 @@ export async function GET(req: NextRequest) {
     storage: savedToSupabase ? "supabase+file" : "file",
     topPropsSync,
     logsRefreshSync,
+    resultsSync,
   });
 }

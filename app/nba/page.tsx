@@ -609,6 +609,11 @@ function NbaPageInner() {
           awayCode: String(item.teamCode ?? "").trim().toUpperCase() || "—",
           homeCode: String(item.opponentCode ?? "").trim().toUpperCase() || "—",
           bookmaker: item.bookmaker ?? null,
+          dvpRank: item.dvpRank ?? null,
+          dvpTotalTeams: item.dvpTotalTeams ?? null,
+          dvpMetricFlag: item.dvpMetricFlag ?? null,
+          dvpValue: item.dvpValue ?? null,
+          dvpPosition: item.dvpPosition ?? null,
         }))
         .filter((item) => Number.isFinite(item.line) && Number.isFinite(item.odds));
       setTopProps(normalized);

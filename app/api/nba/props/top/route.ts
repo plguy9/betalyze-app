@@ -1251,7 +1251,7 @@ export async function GET(req: NextRequest) {
         const mean = avg(values);
         const sd = stdDev(values);
         const cv = mean > 0 ? sd / mean : 1;
-        const lineEdgeBase = line > 0 ? clamp(((mean - line) / line) * 30, -14, 14) : 0;
+        const lineEdgeBase = line > 0 ? clamp(((mean - line) / line) * 26, -12, 12) : 0;
         const awayCode = pack.awayCode;
         const homeCode = pack.homeCode;
         const gameCodes = new Set(
@@ -1375,7 +1375,7 @@ export async function GET(req: NextRequest) {
             : null;
         const dvpScoreBase = dvpScoreFromRank(dvpMetricRank);
         // Même courbe en paliers que dvpScoreFromRank, scalée à ±20 pour le rawScore
-        const rankEdgeBase = dvpScoreBase * 2;
+        const rankEdgeBase = dvpScoreBase * 1.5;
 
         const dvpRow =
           dvpPosition && Number.isFinite(Number(opponentTeamId ?? NaN))
@@ -1404,7 +1404,7 @@ export async function GET(req: NextRequest) {
                 ? "strength"
                 : "neutral";
         const strengthEdgeBase =
-          dvpMetricFlag === "weakness" ? 8 : dvpMetricFlag === "strength" ? -8 : 0;
+          dvpMetricFlag === "weakness" ? 6 : dvpMetricFlag === "strength" ? -6 : 0;
 
         const h2hValues = opponentCode
           ? logs
@@ -1421,7 +1421,7 @@ export async function GET(req: NextRequest) {
         const matchupBase = (h2hValues.length ? h2hValues : values.slice(0, 5)).filter((v) =>
           Number.isFinite(v),
         );
-        const consistencyEdge = clamp((0.35 - cv) * 20, -6, 6);
+        const consistencyEdge = clamp((0.35 - cv) * 18, -5, 5);
         const consistencyScore = consistencyScoreFromCv(cv);
         const sampleEdge = values.length < 5 ? clamp((values.length - 5) * 2, -6, 0) : 0;
 
@@ -1457,11 +1457,11 @@ export async function GET(req: NextRequest) {
           const modelEdgePct = weightedHitRate - impliedProbabilityPct;
           const americanOdds = decimalToAmericanOdds(odd);
           const lineEdge = lineEdgeBase * sideMultiplier;
-          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 28, -14, 14);
+          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 24, -12, 12);
           const rankEdge = rankEdgeBase * sideMultiplier;
           const strengthEdge = strengthEdgeBase * sideMultiplier;
           const matchupPct = pctHit(matchupBase, line, side);
-          const h2hEdge = clamp(((matchupPct / 100) - 0.5) * 20, -6, 6);
+          const h2hEdge = clamp(((matchupPct / 100) - 0.5) * 18, -5, 5);
           const recommendationTag = recommendationTagFromSignals(weightedHitRate, americanOdds);
           const edgePct = edge * 100;
           const rawScore =

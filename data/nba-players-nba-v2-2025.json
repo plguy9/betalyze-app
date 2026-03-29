@@ -1,7 +1,7 @@
 {
   "season": "2025",
-  "updatedAt": "2026-03-27T01:46:06.662Z",
-  "count": 626,
+  "updatedAt": "2026-03-29T17:24:11.086Z",
+  "count": 627,
   "players": [
     {
       "id": 236,
@@ -2262,6 +2262,23 @@
       "height": "2.11",
       "weight": "97.5",
       "birthDate": "2001-06-18",
+      "isActive": true
+    },
+    {
+      "id": 3399,
+      "firstName": "Olivier",
+      "lastName": "Sarr",
+      "fullName": "Olivier Sarr",
+      "teamId": 38,
+      "teamName": "Toronto Raptors",
+      "teamCode": null,
+      "position": "C",
+      "jerseyNumber": "30",
+      "age": null,
+      "nationality": "France",
+      "height": null,
+      "weight": null,
+      "birthDate": "1999-02-20",
       "isActive": true
     },
     {
@@ -9184,6 +9201,23 @@
       "isActive": true
     },
     {
+      "id": 1948,
+      "firstName": "DaQuan",
+      "lastName": "Jeffries",
+      "fullName": "DaQuan Jeffries",
+      "teamId": 30,
+      "teamName": "Sacramento Kings",
+      "teamCode": null,
+      "position": "G-F",
+      "jerseyNumber": "8",
+      "age": null,
+      "nationality": "USA",
+      "height": "1.96",
+      "weight": "102.1",
+      "birthDate": "1997-08-30",
+      "isActive": true
+    },
+    {
       "id": 3475,
       "firstName": "Keegan",
       "lastName": "Murray",
@@ -9878,23 +9912,6 @@
       "height": "1.98",
       "weight": "81.6",
       "birthDate": "2000-07-15",
-      "isActive": true
-    },
-    {
-      "id": 3399,
-      "firstName": "Olivier",
-      "lastName": "Sarr",
-      "fullName": "Olivier Sarr",
-      "teamId": 38,
-      "teamName": "Toronto Raptors",
-      "teamCode": null,
-      "position": "C",
-      "jerseyNumber": "30",
-      "age": null,
-      "nationality": "France",
-      "height": null,
-      "weight": null,
-      "birthDate": "1999-02-20",
       "isActive": true
     },
     {

@@ -1109,7 +1109,12 @@ function teamsMatch(a: string | null | undefined, b: string | null | undefined) 
   const nb = normalizeText(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
-  return na.includes(nb) || nb.includes(na);
+  if (na.includes(nb) || nb.includes(na)) return true;
+  // Handle city abbreviations: "LA Clippers" vs "Los Angeles Clippers"
+  const naLast = na.split(" ").pop() ?? "";
+  const nbLast = nb.split(" ").pop() ?? "";
+  if (naLast.length >= 4 && naLast === nbLast) return true;
+  return false;
 }
 
 function formatDecimalOdd(value: number | null | undefined): string | null {

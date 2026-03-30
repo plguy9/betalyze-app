@@ -329,6 +329,14 @@ export function BestPropsSection({
                     >
                       {formatEdge(p.edge)} edge
                     </span>
+                    {Number.isFinite(p.hitRateL10 ?? NaN) && (
+                      <span
+                        className="text-[11px] tabular-nums"
+                        style={{ color: Number(p.hitRateL10) >= 70 ? "#34d399" : Number(p.hitRateL10) >= 50 ? "rgba(255,255,255,.55)" : "#fb7185" }}
+                      >
+                        L10 <span className="font-bold">{Number(p.hitRateL10).toFixed(0)}%</span>
+                      </span>
+                    )}
                     <span className="text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
                       BZ <span className="font-bold text-white/50">{formatDecimal(p.score, 0)}</span>
                     </span>

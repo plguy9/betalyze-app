@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
             userId,
             customerId,
             subscriptionId,
-            status: "active",
+            status: "trialing",
           });
         }
         break;

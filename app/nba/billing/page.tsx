@@ -144,10 +144,13 @@ export default function NbaBillingPage() {
 
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<AccountPayload | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("free");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
 
-  // For now, everyone is on the free plan
-  const currentPlan: Plan["id"] = "free";
+  const isPro = subscriptionStatus === "active" || subscriptionStatus === "trialing";
+  const currentPlan: Plan["id"] = isPro ? "pro_nba" : "free";
 
   useEffect(() => {
     (async () => {
@@ -156,6 +159,7 @@ export default function NbaBillingPage() {
         if (!res.ok) { setLoading(false); return; }
         const data = await res.json();
         if (data.ok && data.account) setAccount(data.account);
+        if (data.subscriptionStatus) setSubscriptionStatus(data.subscriptionStatus);
       } catch {
         // silent
       } finally {
@@ -166,6 +170,32 @@ export default function NbaBillingPage() {
       if (comingSoonTimer.current) clearTimeout(comingSoonTimer.current);
     };
   }, []);
+
+  const handleUpgrade = async () => {
+    try {
+      setCheckoutLoading(true);
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const data = await res.json() as { url?: string; error?: string };
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // silent
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const handlePortal = async () => {
+    try {
+      setPortalLoading(true);
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const data = await res.json() as { url?: string; error?: string };
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // silent
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   const handleComingSoon = (sport: string) => {
     setComingSoon(`${sport} arrive bientôt sur Betalyze.`);
@@ -233,14 +263,23 @@ export default function NbaBillingPage() {
                     <div className="mt-2 h-6 w-32 animate-pulse rounded-full bg-white/[0.07]" />
                   ) : (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <span className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-bold text-white/80">
-                        Gratuit
+                      <span className={cn(
+                        "rounded-full border px-3 py-1 text-sm font-bold",
+                        isPro
+                          ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                          : "border-white/15 bg-white/8 text-white/80"
+                      )}>
+                        {isPro ? "Pro — NBA" : "Gratuit"}
                       </span>
-                      <span className="text-[11px] text-white/35">0 $ / mois</span>
+                      <span className="text-[11px] text-white/35">
+                        {isPro ? (subscriptionStatus === "trialing" ? "Essai gratuit · 7 jours" : "7,99 $ / mois") : "0 $ / mois"}
+                      </span>
                     </div>
                   )}
                   <p className="mt-2 text-[11px] text-white/40">
-                    Accès limité — passe à Pro pour débloquer tous les modules NBA.
+                    {isPro
+                      ? "Accès complet à tous les modules NBA."
+                      : "Accès limité — passe à Pro pour débloquer tous les modules NBA."}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -314,19 +353,31 @@ export default function NbaBillingPage() {
                     {/* CTA */}
                     <button
                       type="button"
-                      disabled={isCurrent || plan.comingSoon}
+                      disabled={isCurrent || plan.comingSoon || checkoutLoading || portalLoading}
+                      onClick={() => {
+                        if (isCurrent && isPro) { void handlePortal(); return; }
+                        if (plan.id === "pro_nba" && !isCurrent) { void handleUpgrade(); return; }
+                      }}
                       className={cn(
                         "mt-6 w-full rounded-xl py-2.5 text-[12px] font-bold transition",
-                        isCurrent
+                        isCurrent && !isPro
                           ? "cursor-default border border-white/10 bg-white/5 text-white/35"
-                          : isHighlighted && !plan.comingSoon
-                            ? "text-black shadow-lg shadow-amber-500/20 hover:brightness-105"
-                            : "border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
+                          : isCurrent && isPro
+                            ? "border border-white/20 bg-white/8 text-white/70 hover:bg-white/12"
+                            : isHighlighted && !plan.comingSoon
+                              ? "text-black shadow-lg shadow-amber-500/20 hover:brightness-105"
+                              : "border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
                         plan.comingSoon && "cursor-not-allowed",
                       )}
                       style={isHighlighted && !plan.comingSoon && !isCurrent ? { background: "linear-gradient(135deg, #ff8a00 0%, #ffb14a 100%)" } : undefined}
                     >
-                      {isCurrent ? "Plan actuel" : plan.comingSoon ? "Bientôt disponible" : plan.cta}
+                      {isCurrent && isPro
+                        ? (portalLoading ? "Chargement…" : "Gérer l'abonnement")
+                        : isCurrent
+                          ? "Plan actuel"
+                          : plan.comingSoon
+                            ? "Bientôt disponible"
+                            : checkoutLoading ? "Chargement…" : plan.cta}
                     </button>
                   </div>
                 );

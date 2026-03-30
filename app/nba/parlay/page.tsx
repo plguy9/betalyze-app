@@ -22,11 +22,17 @@ import {
 import { NbaSidebar, type NbaSidebarPage } from "@/app/nba/components/nba-sidebar";
 import { NbaHeader } from "@/app/nba/components/nba-header";
 import { MobileBottomNav } from "@/app/nba/components/mobile-bottom-nav";
-import { Card, LeagueTab } from "@/app/nba/components/nba-ui";
+import { Card, LeagueTab, TabGroup } from "@/app/nba/components/nba-ui";
 import {
   getTeamPrimaryColor,
   hexToRgba,
   formatOddsForDisplay,
+  formatGameTimeForUser,
+  torontoYmd,
+  inferSeasonForDate,
+  gradeTone,
+  formatEdge,
+  formatDecimal,
   type OddsDisplayFormat,
 } from "@/app/nba/components/nba-helpers";
 import {
@@ -36,10 +42,11 @@ import {
   upsertParlayDraftLeg,
   writeParlayDraftLegs,
 } from "@/lib/nba/parlay-draft";
+import { getNbaCdnTeamLogo } from "@/lib/nba/constants";
 import type { ParlayLegV1, ParlayQuoteResponseV1, ParlayTicket } from "@/types/parlay";
 
 type RecommendationTag = "SAFE" | "BALANCED" | "AGGRESSIVE" | "LONGSHOT";
-type TagFilter = "ALL" | RecommendationTag;
+type GradeFilter = "ALL" | "S" | "A" | "B" | "C";
 
 type TopProp = {
   id: string;
@@ -71,6 +78,8 @@ type TopProp = {
   consistencyScore?: number;
   recommendationScore?: number;
   recommendationTag?: RecommendationTag;
+  score?: number;
+  finalScore?: number;
 };
 
 type TopPropsApiPayload = {
@@ -78,6 +87,9 @@ type TopPropsApiPayload = {
   props?: TopProp[];
   error?: string;
 };
+
+const FINISHED_STATUSES = new Set(["FT", "AOT", "AET", "AWD", "WO", "ABD"]);
+const LIVE_STATUSES = new Set(["Q1", "Q2", "Q3", "Q4", "HT", "OT", "LIVE", "1Q", "2Q", "3Q", "4Q"]);
 
 // ─── Style configs ────────────────────────────────────────────────────────────
 
@@ -248,6 +260,9 @@ function NbaParlayPageInner() {
 
   // Data state
   const [oddsFormat, setOddsFormat] = useState<OddsDisplayFormat>("decimal");
+  const [userTimezone, setUserTimezone] = useState("America/Toronto");
+  const [gameTimeByKey, setGameTimeByKey] = useState<Map<string, string>>(new Map());
+  const [gameStatusByKey, setGameStatusByKey] = useState<Map<string, string>>(new Map());
   const [topProps, setTopProps] = useState<TopProp[]>([]);
   const [loadingTopProps, setLoadingTopProps] = useState(true);
   const [topPropsError, setTopPropsError] = useState<string | null>(null);
@@ -263,8 +278,10 @@ function NbaParlayPageInner() {
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
 
   // Filter state
-  const [filterTag, setFilterTag] = useState<TagFilter>("ALL");
+  const [filterGrade, setFilterGrade] = useState<GradeFilter>("ALL");
   const [filterMetric, setFilterMetric] = useState<string>("ALL");
+  const [filterGame, setFilterGame] = useState<string>("ALL");
+  const [filterSide, setFilterSide] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // DvP client-side lookup
@@ -297,7 +314,7 @@ function NbaParlayPageInner() {
     };
   }, []);
 
-  // Fetch user odds format preference
+  // Fetch user settings (odds format + timezone)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -306,7 +323,7 @@ function NbaParlayPageInner() {
         if (!res.ok) return;
         const data = (await res.json()) as {
           ok?: boolean;
-          settings?: { oddsFormat?: string | null };
+          settings?: { oddsFormat?: string | null; timezone?: string | null };
         };
         if (!data?.ok) return;
         const next: OddsDisplayFormat =
@@ -314,7 +331,52 @@ function NbaParlayPageInner() {
             ? "american"
             : "decimal";
         if (!cancelled) setOddsFormat(next);
+        const tz = String(data.settings?.timezone ?? "").trim();
+        if (!cancelled && tz) setUserTimezone(tz);
       } catch { /* keep default */ }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch today's games to get start times
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const todayDate = torontoYmd(0);
+        const inferredSeason = inferSeasonForDate(todayDate);
+        const gamesParams = new URLSearchParams({ date: todayDate, league: "12", timezone: "America/Toronto" });
+        if (inferredSeason) gamesParams.set("season", inferredSeason);
+        const res = await fetch(`/api/nba/games?${gamesParams.toString()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          ok?: boolean;
+          response?: Array<{
+            id?: number | null;
+            date?: string | null;
+            status?: { short?: string | null } | null;
+            teams?: {
+              home?: { code?: string | null };
+              away?: { code?: string | null };
+            } | null;
+          }>;
+        };
+        if (!Array.isArray(data.response)) return;
+        const timeMap = new Map<string, string>();
+        const statusMap = new Map<string, string>();
+        for (const g of data.response) {
+          const home = String(g.teams?.home?.code ?? "").toUpperCase();
+          const away = String(g.teams?.away?.code ?? "").toUpperCase();
+          if (!home || !away) continue;
+          const [a, b] = [home, away].sort();
+          const pairKey = `${a}@${b}`;
+          if (g.date) timeMap.set(pairKey, g.date);
+          const status = String(g.status?.short ?? "").toUpperCase();
+          if (status) statusMap.set(pairKey, status);
+        }
+        if (!cancelled) { setGameTimeByKey(timeMap); setGameStatusByKey(statusMap); }
+      } catch { /* ignore */ }
     };
     void load();
     return () => { cancelled = true; };
@@ -366,7 +428,7 @@ function NbaParlayPageInner() {
       try {
         setLoadingTopProps(true);
         setTopPropsError(null);
-        const res = await fetch("/api/nba/props/top?mode=alternates_best&limit=180&refresh=1", {
+        const res = await fetch("/api/nba/props/top?mode=alternates_best&limit=180", {
           cache: "no-store",
         });
         const data = (await res.json()) as TopPropsApiPayload;
@@ -489,32 +551,58 @@ function NbaParlayPageInner() {
     return ["ALL", ...Array.from(set).sort()];
   }, [topProps]);
 
-  const tagCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      ALL: topProps.length,
-      SAFE: 0,
-      BALANCED: 0,
-      AGGRESSIVE: 0,
-      LONGSHOT: 0,
-    };
+  // Unique games derived from props: key = "AWAY@HOME", label = "AWAY vs HOME · HH:MM"
+  const availableGames = useMemo(() => {
+    const map = new Map<string, string>();
     for (const p of topProps) {
-      if (p.recommendationTag) {
-        counts[p.recommendationTag] = (counts[p.recommendationTag] ?? 0) + 1;
+      if (!p.teamCode || !p.opponentCode) continue;
+      const [a, b] = [p.teamCode.toUpperCase(), p.opponentCode.toUpperCase()].sort();
+      const key = `${a}@${b}`;
+      if (!map.has(key)) {
+        const dateIso = gameTimeByKey.get(key);
+        const timeStr = dateIso ? formatGameTimeForUser(dateIso, userTimezone) : "";
+        map.set(key, timeStr ? `${a} vs ${b} · ${timeStr}` : `${a} vs ${b}`);
       }
+    }
+    return [
+      { key: "ALL", label: "Tous les matchs" },
+      ...Array.from(map.entries())
+        .map(([key, label]) => ({ key, label }))
+        .sort((a, b) => {
+          const ta = gameTimeByKey.get(a.key) ? new Date(gameTimeByKey.get(a.key)!).getTime() : Infinity;
+          const tb = gameTimeByKey.get(b.key) ? new Date(gameTimeByKey.get(b.key)!).getTime() : Infinity;
+          return ta - tb;
+        }),
+    ];
+  }, [topProps, gameTimeByKey, userTimezone]);
+
+  const gradeCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: 0, S: 0, A: 0, B: 0, C: 0 };
+    for (const p of topProps) {
+      counts.ALL++;
+      const g = String(p.grade ?? "").toUpperCase();
+      if (g in counts) counts[g]++;
     }
     return counts;
   }, [topProps]);
 
   const filteredProps = useMemo(() => {
     return topProps.filter((p) => {
-      if (filterTag !== "ALL" && p.recommendationTag !== filterTag) return false;
+      // Exclure les props dont le game est terminé
+      const [a, b] = [p.teamCode?.toUpperCase() ?? "", p.opponentCode?.toUpperCase() ?? ""].sort();
+      const pairKey = `${a}@${b}`;
+      const status = gameStatusByKey.get(pairKey);
+      if (status && FINISHED_STATUSES.has(status)) return false;
+      if (filterGrade !== "ALL" && String(p.grade ?? "").toUpperCase() !== filterGrade) return false;
       if (filterMetric !== "ALL" && p.metric.toUpperCase() !== filterMetric) return false;
+      if (filterGame !== "ALL" && pairKey !== filterGame) return false;
+      if (filterSide !== "ALL" && p.side !== filterSide) return false;
       if (searchQuery.trim()) {
         if (!p.player.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       }
       return true;
     });
-  }, [topProps, filterTag, filterMetric, searchQuery]);
+  }, [topProps, gameStatusByKey, filterGrade, filterMetric, filterGame, filterSide, searchQuery]);
 
   const parlayQuality = useMemo(() => {
     if (legs.length === 0) return null;
@@ -676,75 +764,80 @@ function NbaParlayPageInner() {
               <Card>
                 <div className="p-4 sm:p-5">
 
-                  {/* Tag filter tabs */}
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    {(["ALL", "SAFE", "BALANCED", "AGGRESSIVE", "LONGSHOT"] as TagFilter[]).map(
-                      (tag) => {
-                        const isActive = filterTag === tag;
-                        const s = tag !== "ALL" ? TAG_STYLES[tag] : null;
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => setFilterTag(tag)}
-                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                              isActive
-                                ? tag === "ALL"
-                                  ? "border-white/25 bg-white/12 text-white"
-                                  : (s?.badge ?? "")
-                                : "border-white/10 bg-transparent text-white/35 hover:text-white/65"
-                            }`}
-                          >
-                            {tag === "ALL" ? "Tous" : tag}
-                            {tagCounts[tag] !== undefined && (
-                              <span className="ml-1.5 text-[10px] opacity-55">
-                                {tagCounts[tag]}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-
-                  {/* Sub-filters: metric + search */}
-                  <div className="mb-4 flex gap-2">
-                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 shrink-0">
-                      <span className="text-[10px] text-white/35">Stat</span>
-                      <select
-                        value={filterMetric}
-                        onChange={(e) => setFilterMetric(e.target.value)}
-                        className="bg-transparent text-[11px] font-medium text-white/80 outline-none"
-                      >
-                        {availableMetrics.map((m) => (
-                          <option key={m} value={m} className="bg-[#0b0f18] text-white">
-                            {m === "ALL" ? "Toutes" : m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-1 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5">
-                      <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Chercher un joueur…"
-                        className="flex-1 min-w-0 bg-transparent text-[12px] text-white placeholder-white/25 outline-none"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                      />
-                      {searchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchQuery("")}
-                          className="text-white/25 hover:text-white/55"
+                  {/* Filters — même style que best-props-section */}
+                  <div className="mb-4 space-y-2.5">
+                    {/* Row 1: Match + Stat + Side */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                        <span className="text-[11px] text-white/45">Match</span>
+                        <select
+                          value={filterGame}
+                          onChange={(e) => setFilterGame(e.target.value)}
+                          className="max-w-[130px] bg-transparent text-[11px] font-medium text-white/90 outline-none sm:max-w-none"
                         >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+                          {availableGames.map(({ key, label }) => (
+                            <option key={key} value={key} className="bg-[#0b0f18] text-white">
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                        <span className="text-[11px] text-white/45">Stat</span>
+                        <select
+                          value={filterMetric}
+                          onChange={(e) => setFilterMetric(e.target.value)}
+                          className="bg-transparent text-[11px] font-medium text-white/90 outline-none"
+                        >
+                          {availableMetrics.map((m) => (
+                            <option key={m} value={m} className="bg-[#0b0f18] text-white">
+                              {m === "ALL" ? "Toutes" : m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <TabGroup
+                        value={filterSide}
+                        onChange={setFilterSide}
+                        options={[
+                          { value: "ALL", label: "Tous" },
+                          { value: "over", label: "Over" },
+                          { value: "under", label: "Under" },
+                        ]}
+                      />
+                    </div>
+                    {/* Row 2: Tag + Search */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TabGroup
+                        value={filterGrade}
+                        onChange={(v) => setFilterGrade(v as GradeFilter)}
+                        options={[
+                          { value: "ALL", label: "Tous" },
+                          { value: "S", label: "S" },
+                          { value: "A", label: "A" },
+                          { value: "B", label: "B" },
+                          { value: "C", label: "C" },
+                        ]}
+                      />
+                      <div className="flex flex-1 min-w-[140px] items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                        <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Joueur…"
+                          className="flex-1 min-w-0 bg-transparent text-[11px] text-white/90 placeholder-white/25 outline-none"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                        />
+                        {searchQuery && (
+                          <button type="button" onClick={() => setSearchQuery("")} className="text-white/25 hover:text-white/55">
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -803,9 +896,6 @@ function NbaParlayPageInner() {
                         const key = parlayLegIdentityKey(leg);
                         const isSelected = selectedKeys.has(key);
                         const isFlashing = recentlyAddedId === prop.id;
-                        const tagS = prop.recommendationTag
-                          ? TAG_STYLES[prop.recommendationTag]
-                          : null;
                         const primary = getTeamPrimaryColor(prop.teamCode);
                         const hr = prop.hitRateL10 ?? prop.hitRate;
                         const hrColor = hitRateColor(hr);
@@ -833,191 +923,152 @@ function NbaParlayPageInner() {
                           : dvpEntry?.flag === "strength" ? "#f87171"
                           : "rgba(255,255,255,.35)";
                         const dvpPos = dvpEntry?.position ?? prop.dvpPosition;
-                        const dvpPositionLabel =
-                          dvpPos === "G" ? "Guards"
-                          : dvpPos === "F" ? "Forwards"
-                          : dvpPos === "C" ? "Centers"
+                        const isTopGrade = prop.grade === "S" || prop.grade === "A";
+                        const gradientOpacity = isTopGrade ? 0.22 : prop.grade === "B" ? 0.15 : 0.10;
+                        const borderOpacity = isTopGrade ? 0.50 : prop.grade === "B" ? 0.35 : 0.22;
+                        const sideLabel = prop.side === "over" ? "Over" : "Under";
+                        const matchupKey = prop.teamCode && prop.opponentCode
+                          ? [prop.teamCode.toUpperCase(), prop.opponentCode.toUpperCase()].sort().join("@")
                           : null;
-                        const cst = consistencyInfo(prop.consistencyScore);
-                        const hasL5 = Number.isFinite(prop.hitRateL5 ?? NaN);
-                        const hasL20 = Number.isFinite(prop.hitRateL20 ?? NaN);
-                        const hasSeason = Number.isFinite(prop.seasonHitRate ?? NaN);
-                        const impliedProb = Number.isFinite(prop.impliedProbability ?? NaN)
-                          ? Number(prop.impliedProbability)
-                          : null;
+                        const gameStatus = matchupKey ? (gameStatusByKey.get(matchupKey) ?? null) : null;
+                        const isLive = gameStatus ? LIVE_STATUSES.has(gameStatus) : false;
+                        const matchTime = matchupKey ? gameTimeByKey.get(matchupKey) ?? null : null;
+                        const matchTimeStr = isLive ? gameStatus : (matchTime ? formatGameTimeForUser(matchTime, userTimezone) : null);
+
                         return (
                           <div
                             key={prop.id}
-                            className="group relative overflow-hidden rounded-xl border transition-all duration-200"
+                            className="group relative overflow-hidden rounded-xl border transition"
                             style={{
-                              borderColor: isSelected
-                                ? hexToRgba(primary, 0.50)
-                                : tagS?.border ?? "rgba(255,255,255,.09)",
-                              background: isSelected
-                                ? `linear-gradient(135deg, ${hexToRgba(primary, 0.14)} 0%, rgba(5,5,8,.97) 65%)`
-                                : tagS
-                                ? `linear-gradient(135deg, ${tagS.bg} 0%, rgba(5,5,8,.97) 65%)`
-                                : "rgba(255,255,255,.02)",
-                              boxShadow: isSelected
-                                ? `inset 3px 0 0 ${hexToRgba(primary, 0.65)}`
-                                : tagS
-                                ? `inset 3px 0 0 ${tagS.border}`
-                                : "none",
+                              background: `linear-gradient(135deg, ${hexToRgba(primary, gradientOpacity)} 0%, rgba(5,5,8,.97) 60%)`,
+                              borderColor: hexToRgba(primary, borderOpacity),
+                              boxShadow: `inset 3px 0 0 ${hexToRgba(primary, isTopGrade ? 0.70 : prop.grade === "B" ? 0.50 : 0.35)}`,
                             }}
                           >
-                            <div className="px-3.5 py-2.5">
-                              {/* Row 1: badges + add button */}
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  {prop.recommendationTag && tagS && (
-                                    <span
-                                      className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black tracking-wide ${tagS.badge}`}
-                                    >
-                                      {prop.recommendationTag}
-                                    </span>
-                                  )}
-                                  {prop.grade && (
-                                    <span className="rounded-md border border-white/12 bg-white/5 px-1.5 py-0.5 text-[10px] font-bold text-white/45">
-                                      {prop.grade}
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={isSelected || legs.length >= 10}
-                                  onClick={() => addToParlay(prop)}
-                                  className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
-                                    isSelected || isFlashing
-                                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                                      : "border-white/15 bg-white/5 text-white/60 hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-200"
-                                  } disabled:cursor-not-allowed`}
-                                >
-                                  {isSelected ? (
-                                    <>
-                                      <span className="text-[10px]">✓</span> Ajouté
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="h-3 w-3" /> Parlay
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-
-                              {/* Row 2: player name + matchup */}
-                              <div className="mt-1.5 flex items-baseline justify-between gap-2">
-                                <p className="truncate text-[15px] font-bold leading-tight text-white/95">
-                                  {prop.player}
-                                </p>
-                                {prop.teamCode && (
-                                  <span className="shrink-0 text-[10px] text-white/28">
-                                    {prop.teamCode}
-                                    {prop.opponentCode ? ` vs ${prop.opponentCode}` : ""}
+                            {/* Top row: grade + matchup + time */}
+                            <div className="flex items-center justify-between px-3 pt-2.5">
+                              <span className={`rounded-md px-2 py-0.5 text-[11px] font-black ring-1 ${gradeTone(prop.grade)}`}>
+                                {prop.grade}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {getNbaCdnTeamLogo(prop.teamCode) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={getNbaCdnTeamLogo(prop.teamCode)!} alt={prop.teamCode ?? ""} className="h-4 w-4 object-contain opacity-80" />
+                                )}
+                                <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,.45)" }}>
+                                  {prop.teamCode}
+                                </span>
+                                <span className="text-[9px]" style={{ color: "rgba(255,255,255,.20)" }}>vs</span>
+                                {getNbaCdnTeamLogo(prop.opponentCode) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={getNbaCdnTeamLogo(prop.opponentCode)!} alt={prop.opponentCode ?? ""} className="h-4 w-4 object-contain opacity-80" />
+                                )}
+                                <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,.45)" }}>
+                                  {prop.opponentCode ?? "?"}
+                                </span>
+                                {matchTimeStr && (
+                                  <span
+                                    className="text-[9px] font-bold"
+                                    style={{ color: isLive ? "#34d399" : "rgba(255,255,255,.22)" }}
+                                  >
+                                    · {matchTimeStr}
                                   </span>
                                 )}
                               </div>
+                            </div>
 
-                              {/* Row 3: market + odds */}
+                            {/* Player name + line + odds */}
+                            <div className="px-3 pb-0 pt-2">
+                              <p className="truncate text-[15px] font-bold leading-tight text-white/95">
+                                {prop.player}
+                              </p>
                               <div className="mt-1 flex items-center gap-1.5">
-                                <span className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-[11px] font-semibold text-white/75">
-                                  {prop.metric} {prop.side === "over" ? "Over" : "Under"} {prop.line}
+                                <span
+                                  className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                                  style={{ background: "rgba(0,0,0,.30)", border: "1px solid rgba(255,255,255,.10)", color: "rgba(255,255,255,.65)" }}
+                                >
+                                  {prop.metric} {sideLabel} {formatDecimal(prop.line, 1)}
                                 </span>
-                                <span className="rounded-md border border-white/8 bg-black/20 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white/55">
+                                <span
+                                  className="rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums"
+                                  style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.50)" }}
+                                >
                                   {formatOddsForDisplay(prop.odds, oddsFormat)}
                                 </span>
-                                {impliedProb !== null && (
-                                  <span className="text-[10px] text-white/28 tabular-nums">
-                                    impl. {impliedProb.toFixed(0)}%
-                                  </span>
-                                )}
                               </div>
+                            </div>
 
-                              {/* Row 4: hit rate bar + L5 / L20 / saison */}
-                              <div className="mt-2 space-y-1">
-                                {Number.isFinite(hr) && (
+                            {/* DVP bar */}
+                            {(() => {
+                              const segments = 5;
+                              const filledRaw = dvpEntry?.rank ? ((dvpEntry.totalTeams - dvpEntry.rank + 1) / dvpEntry.totalTeams) * segments : 0;
+                              return (
+                                <div className="px-3 pb-2 pt-1.5">
                                   <div className="flex items-center gap-2">
-                                    <span className="w-5 shrink-0 text-right text-[10px] text-white/30">L10</span>
-                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/8">
-                                      <div
-                                        className="h-full rounded-full transition-all duration-500"
-                                        style={{
-                                          width: `${Math.min(100, Number(hr))}%`,
-                                          background: hrColor,
-                                        }}
-                                      />
-                                    </div>
-                                    <span
-                                      className="w-8 shrink-0 text-right text-[11px] font-bold tabular-nums"
-                                      style={{ color: hrColor }}
-                                    >
-                                      {Number(hr).toFixed(0)}%
+                                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-white/20">
+                                      DEF{dvpPos ? ` vs ${prop.metric} ${dvpPos}` : ""}
                                     </span>
-                                  </div>
-                                )}
-
-                                {/* Mini hit rate row: L5 · L20 · Season */}
-                                {(hasL5 || hasL20 || hasSeason) && (
-                                  <div className="flex items-center gap-3 pl-7">
-                                    {hasL5 && (
-                                      <span className="text-[10px] tabular-nums" style={{ color: hitRateColor(prop.hitRateL5) }}>
-                                        L5 {Number(prop.hitRateL5).toFixed(0)}%
+                                    <div className="flex items-center gap-0.5">
+                                      {Array.from({ length: segments }).map((_, i) => {
+                                        const full = i < Math.floor(filledRaw);
+                                        const half = !full && i === Math.floor(filledRaw) && (filledRaw % 1) >= 0.3;
+                                        const bg = full
+                                          ? dvpColor
+                                          : half
+                                            ? `linear-gradient(to right, ${dvpColor} 50%, rgba(255,255,255,.08) 50%)`
+                                            : "rgba(255,255,255,.08)";
+                                        return <div key={i} className="h-2 w-3.5 rounded-sm" style={{ background: bg }} />;
+                                      })}
+                                    </div>
+                                    {dvpEntry?.rank ? (
+                                      <span className="text-[10px] font-bold tabular-nums" style={{ color: dvpColor }}>
+                                        #{dvpEntry.rank}
                                       </span>
-                                    )}
-                                    {hasL20 && (
-                                      <span className="text-[10px] tabular-nums" style={{ color: hitRateColor(prop.hitRateL20) }}>
-                                        L20 {Number(prop.hitRateL20).toFixed(0)}%
-                                      </span>
-                                    )}
-                                    {hasSeason && (
-                                      <span className="text-[10px] tabular-nums text-white/30">
-                                        Saison {Number(prop.seasonHitRate).toFixed(0)}%
-                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-white/15">N/D</span>
                                     )}
                                   </div>
-                                )}
-                              </div>
-
-                              {/* Row 5: DvP — rang de l'adversaire pour cette métrique */}
-                              {hasDvpReal && (
-                                <div className="mt-2 flex items-center gap-2">
-                                  <span className="text-[9px] font-black tracking-widest text-white/20">DvP</span>
-                                  {prop.opponentCode && (
-                                    <span className="text-[10px] font-semibold text-white/45">vs {prop.opponentCode}</span>
-                                  )}
-                                  <span className="text-[9px] text-white/20">·</span>
-                                  <span className="text-[9px] font-bold text-white/35">{prop.metric}</span>
-                                  {dvpPositionLabel && (
-                                    <span className="text-[9px] text-white/20">/ {dvpPositionLabel}</span>
-                                  )}
-                                  <span
-                                    className="ml-auto rounded-md border px-1.5 py-0.5 text-[11px] font-black tabular-nums"
-                                    style={{
-                                      color: dvpColor,
-                                      borderColor: `${dvpColor}40`,
-                                      background: `${dvpColor}0d`,
-                                    }}
-                                  >
-                                    #{dvpEntry?.rank}/{dvpEntry?.totalTeams}
-                                  </span>
                                 </div>
-                              )}
+                              );
+                            })()}
 
-                              {/* Row 6: Consistency + Edge */}
-                              <div className="mt-1.5 flex items-center gap-2">
-                                {cst && (
-                                  <span className="text-[10px] font-semibold" style={{ color: cst.color }}>
-                                    {cst.label}
+                            {/* Bottom row: hit rate L10 + edge + parlay button */}
+                            <div
+                              className="flex items-center justify-between border-t px-3 py-2"
+                              style={{ borderColor: "rgba(255,255,255,.06)" }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="text-[11px] font-bold tabular-nums"
+                                  style={{ color: edgePos ? "#34d399" : "rgba(255,255,255,.30)" }}
+                                >
+                                  {formatEdge(prop.edge)} edge
+                                </span>
+                                {Number.isFinite(hr) && (
+                                  <span className="text-[11px] tabular-nums" style={{ color: hrColor }}>
+                                    L10 <span className="font-bold">{Number(hr).toFixed(0)}%</span>
                                   </span>
                                 )}
-                                {Number.isFinite(prop.edge ?? NaN) && (
-                                  <span
-                                    className="ml-auto text-[11px] font-bold tabular-nums"
-                                    style={{ color: edgePos ? "#34d399" : "rgba(255,255,255,.28)" }}
-                                  >
-                                    {edgePos ? "+" : ""}{Number(prop.edge).toFixed(1)}% edge
-                                  </span>
-                                )}
+                                <span className="text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
+                                  BZ <span className="font-bold text-white/50">{formatDecimal(prop.finalScore ?? prop.score, 0)}</span>
+                                </span>
                               </div>
+                              <button
+                                type="button"
+                                disabled={isSelected || legs.length >= 10}
+                                onClick={() => addToParlay(prop)}
+                                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                  isSelected || isFlashing
+                                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                                    : "border-white/15 bg-white/5 text-white/60 hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-200"
+                                } disabled:cursor-not-allowed`}
+                              >
+                                {isSelected ? (
+                                  <><span className="text-[10px]">✓</span> Ajouté</>
+                                ) : (
+                                  <><Plus className="h-3 w-3" /> Parlay</>
+                                )}
+                              </button>
                             </div>
                           </div>
                         );

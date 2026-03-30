@@ -39,6 +39,7 @@ import {
   compareStandingsForRank,
   formatFormStreak,
   safeRatio,
+  formatGameTimeForUser,
   type OddsDisplayFormat,
 } from "@/app/nba/components/nba-helpers";
 import type {
@@ -80,6 +81,7 @@ function NbaPageInner() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams?.toString() ?? "";
   const [oddsFormat, setOddsFormat] = useState<OddsDisplayFormat>("decimal");
+  const [userTimezone, setUserTimezone] = useState("America/Toronto");
 
   // --- Teams & Standings ---
   const [teamsPayload, setTeamsPayload] = useState<BetalyzeNbaTeamsPayload | null>(null);
@@ -260,7 +262,7 @@ function NbaPageInner() {
     load();
   }, []);
 
-  // --- Load user settings (odds format) ---
+  // --- Load user settings (odds format + timezone) ---
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -269,7 +271,7 @@ function NbaPageInner() {
         if (!res.ok) return;
         const data = (await res.json()) as {
           ok?: boolean;
-          settings?: { oddsFormat?: string | null };
+          settings?: { oddsFormat?: string | null; timezone?: string | null };
         };
         if (!data?.ok) return;
         const next =
@@ -277,6 +279,8 @@ function NbaPageInner() {
             ? "american"
             : "decimal";
         if (!cancelled) setOddsFormat(next);
+        const tz = String(data.settings?.timezone ?? "").trim();
+        if (!cancelled && tz) setUserTimezone(tz);
       } catch {
         // keep default format
       }
@@ -609,6 +613,7 @@ function NbaPageInner() {
           awayCode: String(item.teamCode ?? "").trim().toUpperCase() || "—",
           homeCode: String(item.opponentCode ?? "").trim().toUpperCase() || "—",
           bookmaker: item.bookmaker ?? null,
+          hitRateL10: Number.isFinite(item.hitRateL10 ?? NaN) ? Number(item.hitRateL10) : null,
           dvpRank: item.dvpRank ?? null,
           dvpTotalTeams: item.dvpTotalTeams ?? null,
           dvpMetricFlag: item.dvpMetricFlag ?? null,
@@ -828,11 +833,20 @@ function NbaPageInner() {
     ];
     const seen = new Set<string>();
 
-    for (const g of playableGameCards) {
+    const sorted = [...playableGameCards].sort((a, b) => {
+      const ta = a.dateIso ? new Date(a.dateIso).getTime() : Infinity;
+      const tb = b.dateIso ? new Date(b.dateIso).getTime() : Infinity;
+      return ta - tb;
+    });
+    for (const g of sorted) {
       const key = String(g.id);
       if (seen.has(key)) continue;
       seen.add(key);
-      options.push({ value: key, label: `${g.away} vs ${g.home}` });
+      const timeStr = g.dateIso ? formatGameTimeForUser(g.dateIso, userTimezone) : "";
+      const label = timeStr
+        ? `${g.away} vs ${g.home} · ${timeStr}`
+        : `${g.away} vs ${g.home}`;
+      options.push({ value: key, label });
     }
 
     if (options.length === 1) {
@@ -850,7 +864,7 @@ function NbaPageInner() {
     }
 
     return options;
-  }, [playableGameCards, topProps]);
+  }, [playableGameCards, topProps, userTimezone]);
 
   useEffect(() => {
     if (topPropsGameFilter === "ALL") return;

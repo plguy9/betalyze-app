@@ -88,6 +88,26 @@ export function formatTimeLabel(game: ApiGame): string {
   return new Date(raw).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
+// Format a UTC ISO timestamp in the user's IANA timezone (e.g. "7:30 PM")
+export function formatGameTimeForUser(
+  dateIso: string | null | undefined,
+  userTimezone: string,
+): string {
+  if (!dateIso) return "";
+  try {
+    const d = new Date(dateIso);
+    if (isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: userTimezone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
 export function computeTotalFromScores(game: ApiGame): number | null {
   const home = game.scores?.home?.total;
   const away = game.scores?.away?.total;

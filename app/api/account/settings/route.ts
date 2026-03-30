@@ -6,6 +6,7 @@ import {
   revokeAllAuthSessionsForUser,
   updateAuthUserPassword,
   updateAuthUserProfile,
+  getSubscriptionStatus,
 } from "@/lib/auth/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import {
@@ -58,7 +59,10 @@ export async function GET(req: NextRequest) {
     return bad("Connecte-toi pour accéder aux settings.", 401);
   }
 
-  const settings = await getOrCreateUserSettings(session.user.id);
+  const [settings, subscriptionStatus] = await Promise.all([
+    getOrCreateUserSettings(session.user.id),
+    getSubscriptionStatus(session.user.id),
+  ]);
   return NextResponse.json({
     ok: true,
     account: {
@@ -68,6 +72,7 @@ export async function GET(req: NextRequest) {
       createdAt: session.user.createdAt,
       sessionExpiresAt: session.expiresAt ?? null,
     },
+    subscriptionStatus,
     settings,
   });
 }

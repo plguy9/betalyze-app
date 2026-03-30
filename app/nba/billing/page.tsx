@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BetalyzeLogo } from "@/components/betalyze-logo";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, Suspense, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
@@ -139,6 +139,14 @@ function LeagueTab({
 /* ── Page ── */
 
 export default function NbaBillingPage() {
+  return (
+    <Suspense>
+      <NbaBillingPageInner />
+    </Suspense>
+  );
+}
+
+function NbaBillingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const comingSoonTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

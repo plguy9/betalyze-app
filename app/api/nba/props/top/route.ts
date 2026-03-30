@@ -1479,6 +1479,8 @@ export async function GET(req: NextRequest) {
           const weightedHitEdge = clamp((weightedHitRate - 50) * 0.24, -12, 12);
           // V2: momentum — joueur en hausse/baisse de forme récente
           const momentumEdge = clamp((hitRateL5 - hitRateL10) * 0.08, -4, 4);
+          // Biais NBA Over : overtimes, fautes tardives et pace favorisent les Overs structurellement
+          const nbaOverBias = side === "over" ? 3 : -3;
           const rankEdge = rankEdgeBase * sideMultiplier;
           const strengthEdge = strengthEdgeBase * sideMultiplier;
           const matchupPct = pctHit(matchupBase, line, side);
@@ -1496,7 +1498,8 @@ export async function GET(req: NextRequest) {
             sampleEdge +
             restDaysEdgeVal * sideMultiplier +
             splitEdgeVal * sideMultiplier +
-            momentumEdge;
+            momentumEdge +
+            nbaOverBias;
           const score = Math.round(clamp(rawScore, 0, 100));
           const grade = gradeFromScore(score);
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { BetalyzeLogo } from "@/components/betalyze-logo";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   BookOpen,
@@ -140,6 +140,7 @@ function LeagueTab({
 
 export default function NbaBillingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const comingSoonTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -155,6 +156,18 @@ export default function NbaBillingPage() {
   useEffect(() => {
     (async () => {
       try {
+        // If coming back from Stripe checkout, fulfill the session directly
+        const sessionId = searchParams.get("session_id");
+        if (sessionId) {
+          await fetch("/api/stripe/fulfill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+          });
+          // Clean URL
+          router.replace("/nba/billing");
+        }
+
         const res = await fetch("/api/account/settings", { cache: "no-store" });
         if (!res.ok) { setLoading(false); return; }
         const data = await res.json();

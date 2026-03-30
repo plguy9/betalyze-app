@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
           userId: String(user.id),
         },
       },
-      success_url: `${origin}/nba?subscribed=1`,
+      success_url: `${origin}/nba/billing?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/nba/billing?canceled=1`,
     });
 

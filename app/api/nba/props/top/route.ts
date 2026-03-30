@@ -632,10 +632,10 @@ function dedupeLogsByGame(rows: LogRow[]): LogRow[] {
 }
 
 function gradeFromScore(score: number): string {
-  if (score >= 96) return "S";
-  if (score >= 84) return "A";
-  if (score >= 70) return "B";
-  if (score >= 54) return "C";
+  if (score >= 88) return "S";
+  if (score >= 76) return "A";
+  if (score >= 63) return "B";
+  if (score >= 50) return "C";
   return "F";
 }
 

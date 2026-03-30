@@ -1036,14 +1036,17 @@ export async function GET(req: NextRequest) {
     const dvpRowsByPos = new Map<DvpPosition, DvpRow[]>();
     const dvpLeagueAvgByPos = new Map<DvpPosition, DvpStatTotals>();
     const dvpMetricRankByPosMetricTeam = new Map<string, number>();
+    const dvpMetricRankL5ByPosMetricTeam = new Map<string, number>();
+    const dvpMetricRankSeasonByPosMetricTeam = new Map<string, number>();
     const dvpTotalTeamsByPos = new Map<DvpPosition, number>();
     const dvpPositionKeys: DvpPosition[] = ["G", "F", "C"];
     await Promise.all(
-      dvpPositionKeys.map(async (position) => {
+      dvpPositionKeys.flatMap((position) =>
+        (["L10", "L5", "season"] as const).map(async (window) => {
         try {
           const dvpUrl = new URL("/api/nba/defense/dvp", origin);
           dvpUrl.searchParams.set("season", season);
-          dvpUrl.searchParams.set("window", "L10");
+          dvpUrl.searchParams.set("window", window);
           dvpUrl.searchParams.set("context", "all");
           dvpUrl.searchParams.set("position", position);
           const dvpRes = await fetch(dvpUrl.toString(), { cache: "no-store" });
@@ -1052,50 +1055,55 @@ export async function GET(req: NextRequest) {
           const rows = (Array.isArray(dvpJson.rows) ? dvpJson.rows : []).filter((row) =>
             Number.isFinite(Number(row.teamId ?? NaN)),
           );
-          dvpRowsByPos.set(position, rows);
-          dvpTotalTeamsByPos.set(position, rows.length);
+          if (window === "L10") {
+            dvpRowsByPos.set(position, rows);
+            dvpTotalTeamsByPos.set(position, rows.length);
+          }
 
-          let totalGames = 0;
-          const totals: Required<DvpStatTotals> = {
-            points: 0,
-            rebounds: 0,
-            assists: 0,
-            minutes: 0,
-            threePointsMade: 0,
-            fieldGoalsMade: 0,
-            fieldGoalsAttempted: 0,
-            freeThrowsMade: 0,
-            freeThrowsAttempted: 0,
-          };
-          for (const row of rows) {
-            const per = row.metrics?.perGame;
-            if (!per) continue;
-            const games = Number(row.games ?? 0);
-            const weight = games > 0 ? games : 1;
-            totalGames += weight;
-            totals.points += Number(per.points ?? 0) * weight;
-            totals.rebounds += Number(per.rebounds ?? 0) * weight;
-            totals.assists += Number(per.assists ?? 0) * weight;
-            totals.minutes += Number(per.minutes ?? 0) * weight;
-            totals.threePointsMade += Number(per.threePointsMade ?? 0) * weight;
-            totals.fieldGoalsMade += Number(per.fieldGoalsMade ?? 0) * weight;
-            totals.fieldGoalsAttempted += Number(per.fieldGoalsAttempted ?? 0) * weight;
-            totals.freeThrowsMade += Number(per.freeThrowsMade ?? 0) * weight;
-            totals.freeThrowsAttempted += Number(per.freeThrowsAttempted ?? 0) * weight;
+          // League avg + ranks only computed from L10 (reference window)
+          if (window === "L10") {
+            let totalGames = 0;
+            const totals = {
+              points: 0, rebounds: 0, assists: 0, minutes: 0,
+              threePointsMade: 0, fieldGoalsMade: 0, fieldGoalsAttempted: 0,
+              freeThrowsMade: 0, freeThrowsAttempted: 0,
+            };
+            for (const row of rows) {
+              const per = row.metrics?.perGame;
+              if (!per) continue;
+              const games = Number(row.games ?? 0);
+              const weight = games > 0 ? games : 1;
+              totalGames += weight;
+              totals.points += Number(per.points ?? 0) * weight;
+              totals.rebounds += Number(per.rebounds ?? 0) * weight;
+              totals.assists += Number(per.assists ?? 0) * weight;
+              totals.minutes += Number(per.minutes ?? 0) * weight;
+              totals.threePointsMade += Number(per.threePointsMade ?? 0) * weight;
+              totals.fieldGoalsMade += Number(per.fieldGoalsMade ?? 0) * weight;
+              totals.fieldGoalsAttempted += Number(per.fieldGoalsAttempted ?? 0) * weight;
+              totals.freeThrowsMade += Number(per.freeThrowsMade ?? 0) * weight;
+              totals.freeThrowsAttempted += Number(per.freeThrowsAttempted ?? 0) * weight;
+            }
+            if (totalGames > 0) {
+              dvpLeagueAvgByPos.set(position, {
+                points: totals.points / totalGames,
+                rebounds: totals.rebounds / totalGames,
+                assists: totals.assists / totalGames,
+                minutes: totals.minutes / totalGames,
+                threePointsMade: totals.threePointsMade / totalGames,
+                fieldGoalsMade: totals.fieldGoalsMade / totalGames,
+                fieldGoalsAttempted: totals.fieldGoalsAttempted / totalGames,
+                freeThrowsMade: totals.freeThrowsMade / totalGames,
+                freeThrowsAttempted: totals.freeThrowsAttempted / totalGames,
+              });
+            }
           }
-          if (totalGames > 0) {
-            dvpLeagueAvgByPos.set(position, {
-              points: totals.points / totalGames,
-              rebounds: totals.rebounds / totalGames,
-              assists: totals.assists / totalGames,
-              minutes: totals.minutes / totalGames,
-              threePointsMade: totals.threePointsMade / totalGames,
-              fieldGoalsMade: totals.fieldGoalsMade / totalGames,
-              fieldGoalsAttempted: totals.fieldGoalsAttempted / totalGames,
-              freeThrowsMade: totals.freeThrowsMade / totalGames,
-              freeThrowsAttempted: totals.freeThrowsAttempted / totalGames,
-            });
-          }
+
+          // Build rank map for each window
+          const rankMap =
+            window === "L5" ? dvpMetricRankL5ByPosMetricTeam
+            : window === "season" ? dvpMetricRankSeasonByPosMetricTeam
+            : dvpMetricRankByPosMetricTeam;
 
           const trendMetrics: TrendMetricKey[] = ["pts", "reb", "ast", "tp", "pra"];
           for (const metricKey of trendMetrics) {
@@ -1112,16 +1120,13 @@ export async function GET(req: NextRequest) {
               )
               .sort((a, b) => Number(a.value) - Number(b.value));
             ranked.forEach((entry, idx) => {
-              dvpMetricRankByPosMetricTeam.set(
-                `${position}:${metricKey}:${entry.teamId}`,
-                idx + 1,
-              );
+              rankMap.set(`${position}:${metricKey}:${entry.teamId}`, idx + 1);
             });
           }
         } catch {
           // keep scoring alive even if DvP is temporarily unavailable
         }
-      }),
+      })),
     );
 
     const playerIds = new Set<number>();
@@ -1373,9 +1378,20 @@ export async function GET(req: NextRequest) {
                 `${dvpPosition}:${trendMetric}:${Number(opponentTeamId)}`,
               ) ?? null)
             : null;
-        const dvpScoreBase = dvpScoreFromRank(dvpMetricRank);
-        // Même courbe en paliers que dvpScoreFromRank, scalée à ±20 pour le rawScore
-        const rankEdgeBase = dvpScoreBase * 1.5;
+        // DVP pondéré : L5×50% + L10×30% + season×20% (plus dynamique qu'un seul window)
+        const dvpRankL5 = dvpPosition && Number.isFinite(Number(opponentTeamId ?? NaN))
+          ? (dvpMetricRankL5ByPosMetricTeam.get(`${dvpPosition}:${trendMetric}:${Number(opponentTeamId)}`) ?? null)
+          : null;
+        const dvpRankSeason = dvpPosition && Number.isFinite(Number(opponentTeamId ?? NaN))
+          ? (dvpMetricRankSeasonByPosMetricTeam.get(`${dvpPosition}:${trendMetric}:${Number(opponentTeamId)}`) ?? null)
+          : null;
+        const dvpScoreBase = weightedAverage([
+          { value: dvpScoreFromRank(dvpRankL5), weight: 0.5 },
+          { value: dvpScoreFromRank(dvpMetricRank), weight: 0.3 },
+          { value: dvpScoreFromRank(dvpRankSeason), weight: 0.2 },
+        ]);
+        // Poids réduit à ×1.0 (±10) vs ×1.5 (±15) avant
+        const rankEdgeBase = dvpScoreBase * 1.0;
 
         const dvpRow =
           dvpPosition && Number.isFinite(Number(opponentTeamId ?? NaN))
@@ -1403,8 +1419,9 @@ export async function GET(req: NextRequest) {
               : dvpMetricDelta <= -0.07
                 ? "strength"
                 : "neutral";
+        // Réduit de ±6 à ±4
         const strengthEdgeBase =
-          dvpMetricFlag === "weakness" ? 6 : dvpMetricFlag === "strength" ? -6 : 0;
+          dvpMetricFlag === "weakness" ? 4 : dvpMetricFlag === "strength" ? -4 : 0;
 
         const h2hValues = opponentCode
           ? logs
@@ -1456,8 +1473,12 @@ export async function GET(req: NextRequest) {
           const impliedProbabilityPct = implied * 100;
           const modelEdgePct = weightedHitRate - impliedProbabilityPct;
           const americanOdds = decimalToAmericanOdds(odd);
-          const lineEdge = lineEdgeBase * sideMultiplier;
-          const hitEdge = clamp(((noteHitPct / 100) - 0.5) * 24, -12, 12);
+          // V2: remplace lineEdge → oddsValueEdge (valeur des cotes)
+          const oddsValueEdge = clamp(modelEdgePct * 0.8, -12, 12);
+          // V2: remplace hitEdge L10 → weightedHitEdge (L10×50% + L20×30% + saison×20%)
+          const weightedHitEdge = clamp((weightedHitRate - 50) * 0.24, -12, 12);
+          // V2: momentum — joueur en hausse/baisse de forme récente
+          const momentumEdge = clamp((hitRateL5 - hitRateL10) * 0.08, -4, 4);
           const rankEdge = rankEdgeBase * sideMultiplier;
           const strengthEdge = strengthEdgeBase * sideMultiplier;
           const matchupPct = pctHit(matchupBase, line, side);
@@ -1466,15 +1487,16 @@ export async function GET(req: NextRequest) {
           const edgePct = edge * 100;
           const rawScore =
             50 +
-            lineEdge +
-            hitEdge +
+            oddsValueEdge +
+            weightedHitEdge +
             rankEdge +
             strengthEdge +
             h2hEdge +
             consistencyEdge +
             sampleEdge +
             restDaysEdgeVal * sideMultiplier +
-            splitEdgeVal * sideMultiplier;
+            splitEdgeVal * sideMultiplier +
+            momentumEdge;
           const score = Math.round(clamp(rawScore, 0, 100));
           const grade = gradeFromScore(score);
 

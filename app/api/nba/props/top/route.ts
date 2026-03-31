@@ -5,6 +5,7 @@ import {
   readNbaTopPropsDailyCache,
   writeNbaTopPropsDailyCache,
 } from "@/lib/supabase/nba-top-props-cache";
+import { getInjuries, type PlayerInjury } from "@/app/api/nba/injuries/route";
 
 const RAW_LEAGUE_ID =
   process.env.APISPORTS_NBA_LEAGUE_ID ?? "standard";
@@ -1033,6 +1034,17 @@ export async function GET(req: NextRequest) {
       return ranked[0] ?? null;
     };
 
+    // Fetch injury data in parallel with DVP
+    const injuriesData = await getInjuries().catch(() => [] as PlayerInjury[]);
+    const injuryByLastName = new Map<string, PlayerInjury>();
+    const outCountByTeamCode = new Map<string, number>();
+    for (const inj of injuriesData) {
+      if (inj.lastName) injuryByLastName.set(inj.lastName.toLowerCase(), inj);
+      if (inj.status === "Out" && inj.teamCode) {
+        outCountByTeamCode.set(inj.teamCode, (outCountByTeamCode.get(inj.teamCode) ?? 0) + 1);
+      }
+    }
+
     const dvpRowsByPos = new Map<DvpPosition, DvpRow[]>();
     const dvpLeagueAvgByPos = new Map<DvpPosition, DvpStatTotals>();
     const dvpMetricRankByPosMetricTeam = new Map<string, number>();
@@ -1183,6 +1195,18 @@ export async function GET(req: NextRequest) {
         map.set(row.player_id, list);
         return map;
       }, new Map<number, LogRow[]>());
+    }
+
+    // Build lastGameDateByTeamCode from loaded player logs (to detect opponent B2B)
+    const lastGameDateByTeamCode = new Map<string, string>();
+    for (const playerLogs of logsByPlayer.values()) {
+      for (const log of playerLogs) {
+        const code = String(log.team_code ?? "").trim().toUpperCase();
+        const logDate = log.date?.slice(0, 10) ?? null;
+        if (!code || !logDate || logDate >= date) continue;
+        const existing = lastGameDateByTeamCode.get(code);
+        if (!existing || logDate > existing) lastGameDateByTeamCode.set(code, logDate);
+      }
     }
 
     const picksByGame = new Map<number, TopProp[]>();
@@ -1451,6 +1475,17 @@ export async function GET(req: NextRequest) {
           isHomeTonight,
           line,
         );
+        // Injury check — skip Out players, penalize Doubtful/Questionable
+        const playerLastName = (String(playerInfo.full_name ?? "").toLowerCase().split(" ").pop() ?? "").trim();
+        const playerInjury = injuryByLastName.get(playerLastName) ?? null;
+        if (playerInjury?.status === "Out") continue; // exclude entirely
+        const injuryPenalty =
+          playerInjury?.status === "Doubtful" ? -8
+          : playerInjury?.status === "Questionable" ? -4
+          : playerInjury?.status === "Day-To-Day" ? -2
+          : 0;
+        const hasOutTeammate = teamCode ? (outCountByTeamCode.get(teamCode) ?? 0) > 0 : false;
+
         const gameKey = Number(pack.gameId ?? NaN);
         if (!Number.isFinite(gameKey)) continue;
         const buildPickForSide = (side: "over" | "under", odd: number | null): TopProp | null => {
@@ -1479,8 +1514,27 @@ export async function GET(req: NextRequest) {
           const weightedHitEdge = clamp((weightedHitRate - 50) * 0.24, -12, 12);
           // V2: momentum — joueur en hausse/baisse de forme récente
           const momentumEdge = clamp((hitRateL5 - hitRateL10) * 0.08, -4, 4);
+          // Opportunité empirique : coéquipier Out ET le joueur joue plus de minutes récemment
+          // → signal direct que le coach lui redistribue du temps de jeu (pas de chevauchement avec momentumEdge)
+          const minutesSeason = dedupedRegularLogs
+            .map((row) => { const m = Number(row.minutes ?? NaN); return Number.isFinite(m) && m > 0 ? m : null; })
+            .filter((m): m is number => m !== null);
+          const avgMinutesSeason = minutesSeason.length >= 5 ? avg(minutesSeason) : null;
+          const avgMinutesL5 = minutesSeason.slice(0, 5).length >= 3 ? avg(minutesSeason.slice(0, 5)) : null;
+          const minutesLift = avgMinutesL5 !== null && avgMinutesSeason !== null && avgMinutesSeason > 0
+            ? (avgMinutesL5 - avgMinutesSeason) / avgMinutesSeason
+            : null;
+          const opportunityBoost = hasOutTeammate && minutesLift !== null && minutesLift > 0.08
+            ? clamp(minutesLift * 35, 0, 8) * sideMultiplier
+            : 0;
           // Biais NBA Over : overtimes, fautes tardives et pace favorisent les Overs structurellement
           const nbaOverBias = side === "over" ? 3 : -3;
+          // Fatigue défensive adversaire : si adversaire en B2B → Over bias (défense relâchée)
+          const opponentLastGame = opponentCode ? (lastGameDateByTeamCode.get(opponentCode) ?? null) : null;
+          const opponentRestDays = opponentLastGame
+            ? Math.round((Date.parse(date.slice(0, 10)) - Date.parse(opponentLastGame)) / 86400000)
+            : null;
+          const opponentFatigueEdge = opponentRestDays === 1 ? 3 * sideMultiplier : 0;
           const rankEdge = rankEdgeBase * sideMultiplier;
           const strengthEdge = strengthEdgeBase * sideMultiplier;
           const matchupPct = pctHit(matchupBase, line, side);
@@ -1499,7 +1553,10 @@ export async function GET(req: NextRequest) {
             restDaysEdgeVal * sideMultiplier +
             splitEdgeVal * sideMultiplier +
             momentumEdge +
-            nbaOverBias;
+            nbaOverBias +
+            injuryPenalty +
+            opportunityBoost +
+            opponentFatigueEdge;
           const score = Math.round(clamp(rawScore, 0, 100));
           const grade = gradeFromScore(score);
 

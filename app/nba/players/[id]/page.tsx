@@ -742,6 +742,7 @@ function PlayerPageInner() {
   const playerImgRef = useRef<HTMLImageElement | null>(null);
   const avatarSrc = "/images/avatar-player.svg";
   const [useAvatarImage, setUseAvatarImage] = useState(true);
+  const [injuryStatus, setInjuryStatus] = useState<{ status: string; comment: string } | null>(null);
 
   const resolvedId = useMemo(() => {
     const rawId = params?.id;
@@ -909,6 +910,18 @@ function PlayerPageInner() {
 
   useEffect(() => {
     setUseAvatarImage(true);
+  }, [dataPlayer]);
+
+  useEffect(() => {
+    const lastName = dataPlayer?.lastName?.trim() || dataPlayer?.fullName?.split(" ").pop()?.trim();
+    if (!lastName) { setInjuryStatus(null); return; }
+    fetch(`/api/nba/injuries?player=${encodeURIComponent(lastName)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const inj = data?.injuries?.[0] ?? null;
+        setInjuryStatus(inj ? { status: inj.status, comment: inj.comment ?? "" } : null);
+      })
+      .catch(() => setInjuryStatus(null));
   }, [dataPlayer]);
 
   const handlePlayerImgError = () => {
@@ -2170,13 +2183,28 @@ function PlayerPageInner() {
                             {dataPlayer.nationality}
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-200">
-                          {typeof dataPlayer?.isActive === "boolean"
-                            ? dataPlayer.isActive
-                              ? "● Active"
-                              : "● Inactive"
-                            : "● N/A"}
-                        </span>
+                        {injuryStatus ? (
+                          <span
+                            title={injuryStatus.comment || undefined}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${
+                              injuryStatus.status === "Out"
+                                ? "border border-red-500/30 bg-red-500/10 text-red-300"
+                                : injuryStatus.status === "Doubtful"
+                                ? "border border-orange-500/30 bg-orange-500/10 text-orange-300"
+                                : "border border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+                            }`}
+                          >
+                            ● {injuryStatus.status}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-200">
+                            {typeof dataPlayer?.isActive === "boolean"
+                              ? dataPlayer.isActive
+                                ? "● Active"
+                                : "● Inactive"
+                              : "● Active"}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
